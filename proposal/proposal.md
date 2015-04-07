@@ -51,6 +51,9 @@ In the current prototype, when the number of comments exceeds ~500, the time for
 
 As far as I know, there is no ground-truth data to evaluate the cluster quality against. What's the best way to test if the results look good?
 
+### Determining cluster cutoffs
+
+Different kinds of articles may have different cluster structures - for instance, for an article in which there is a consensus opinion, we would expect the clusters to be much more nuanced. For a very polarizing article, we could expect the clusters to be very distinct. One challenge is in determining where to set off the cutoffs for clusters in each case.
 
 
 ## Next Steps
