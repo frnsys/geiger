@@ -1,0 +1,78 @@
+{% extends 'layout.html' %}
+
+{% macro render_tree(tree) -%}
+    <ul class="thread">
+        {% for comment in tree %}
+            <li class="comment">
+                <h6>{{ comment.author }} [{{ comment.created_at.strftime('%Y-%m-%d %H:%M') }}]</h6>
+                {{ comment.body|safe }}
+            </li>
+            {% if comment.replies|length > 0 %}
+                {{ render_tree(comment.replies) }}
+            {% endif %}
+        {% endfor %}
+    </ul>
+{%- endmacro %}
+
+{% block content %}
+
+  <style>
+    @import url(http://fonts.googleapis.com/css?family=Libre+Baskerville:400,400italic,700|Source+Sans+Pro:400,700);
+    html, body {
+        font-family: "Libre Baskerville", serif;
+        background: #eaeaea;
+        color: #222;
+    }
+
+    .subject, .comments {
+        max-width: 720px;
+        padding: 4em;
+        margin: 0 auto;
+    }
+    .subject {
+        background: #fff;
+        margin: 4em auto;
+        font-size: 0.8em;
+        line-height: 1.5;
+        box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.05);
+    }
+
+    .thread {
+        list-style-type: none;
+        padding: 0;
+    }
+    .comment {
+        font-family: "Source Sans Pro", serif;
+        margin: 2em 0 0 0;
+        padding: 2em;
+        background: #fff;
+        box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.05);
+    }
+    .comment h6 {
+        margin-top: 0;
+    }
+    .thread .thread {
+        padding-left: 2em;
+    }
+    .thread .thread .comment {
+        margin-top: 1px;
+    }
+
+    .url {
+        font-family: "Source Sans Pro", serif;
+        text-align: center;
+    }
+  </style>
+
+<div class="url">
+    <a href="{{ url }}">{{ url }}</a>
+</div>
+
+<div class="subject">
+    {{ subject|safe }}
+</div>
+<div class="comments">
+    {{ render_tree(comments) }}
+</div>
+
+{% endblock %}
