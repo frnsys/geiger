@@ -9,7 +9,7 @@ Here I propose an automated system for grouping similar comments and then identi
 
 Yelp uses such a system to provide users with a high-level summary of the general opinion towards a service:
 
-![Yelp Example](`yelp.png`)
+![Yelp Example](yelp.png)
 
 Yelp extracts sentences which are representative of the aggregate reviews for particular "aspects" of the service, such as "craft beer" in the example above. They also present how many reviews are aligned with the representative to provide an impression of the support for that opinion.
 
