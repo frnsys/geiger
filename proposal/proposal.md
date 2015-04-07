@@ -55,5 +55,4 @@ As far as I know, there is no ground-truth data to evaluate the cluster quality 
 
 ## Next Steps
 
-- Expand the prototype to take in the URL of any NYT article and cluster the comments.
 - Try building some other features - ideally to find some more informative features and reduce dimensionality (which would help with speed).
