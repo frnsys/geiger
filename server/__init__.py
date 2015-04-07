@@ -3,7 +3,7 @@ from requests.auth import HTTPDigestAuth
 from flask import Flask, render_template
 
 import config
-from comment import Comment
+from geiger.comment import Comment
 from geiger import highlights
 
 app = Flask(__name__, static_folder='static', static_url_path='')

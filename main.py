@@ -2,7 +2,7 @@ import sys
 import config
 import pandas as pd
 from server import app
-from text import Vectorizer, strip_tags, html_decode
+from geiger.text import Vectorizer, strip_tags, html_decode
 from sklearn.externals import joblib
 
 

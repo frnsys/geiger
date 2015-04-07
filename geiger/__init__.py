@@ -4,7 +4,7 @@ Geiger clusters comments to generate a _gist_ of what's happening.
 
 import numpy as np
 from galaxy.cluster.ihac import Hierarchy
-from text import Vectorizer, strip_tags
+from geiger.text import Vectorizer, strip_tags
 from config import vectorizer_path
 from sklearn.externals import joblib
 from statistics import mode
