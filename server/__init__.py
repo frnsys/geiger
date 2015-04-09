@@ -1,10 +1,7 @@
-import requests
-from requests.auth import HTTPDigestAuth
 from flask import Flask, render_template
 
 import config
-from geiger.comment import Comment
-from geiger import highlights
+from geiger import highlights, services, examine
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 
@@ -12,7 +9,7 @@ app = Flask(__name__, static_folder='static', static_url_path='')
 @app.route('/geiger', defaults={'url': ''})
 @app.route('/geiger/<path:url>')
 def geiger(url):
-    asset = get_asset(url)['result']
+    asset = services.get_asset(url)['result']
 
     if asset is None:
         raise Exception('Couldn\'t find an asset matching the url {0}'.format(url))
@@ -23,42 +20,25 @@ def geiger(url):
     else:
         raise Exception('Unrecognized asset')
 
-    comments = [Comment(c) for c in get_comments(url, n=300)]
+    comments = services.get_comments(url, n=300)
 
-    comments = highlights(comments,
+    comments, stats = highlights(comments,
                             min_size=config.min_cluster_size,
                             dist_cutoff=config.distance_cutoff)
-    comments.sort(key=lambda c: c.score, reverse=True)
+    comments.sort(key=lambda c: c[0].score, reverse=True)
 
-    return render_template('index.html', url=url, subject=body, comments=comments)
+    return render_template('index.html', url=url, subject=body, comments=comments, stats=stats)
 
+@app.route('/visualize/<path:url>')
+def visualize(url):
+    comments = services.get_comments(url, n=300)
+    comments, tree, stats = examine(comments)
 
-def get_asset(asset_url):
-    """
-    Fetches an asset's data from the Scoop API.
-    """
-    r = requests.get(config.scoop_base + asset_url, auth=HTTPDigestAuth(*config.scoop_auth))
-    return r.json() if r.status_code == 200 else None
+    return render_template('visualize.html', comments=comments, tree=tree, stats=stats, url=url)
 
+@app.route('/visualize_lda')
+def visualize_lda():
+    from run_lda import main
+    clusters = main()
 
-def get_comments(asset_url, n=100):
-    """
-    Fetches up to n comments for an asset from the Community API.
-    """
-    per_page = 25
-    pages = -(-n//per_page) # ceil
-    params = {
-        'api-key': config.community_key,
-        'url': asset_url,
-        'offset': 0
-    }
-
-    comments = []
-    for i in range(pages):
-        params['offset'] = i * 25
-        r = requests.get(config.community_base, params=params)
-        if r.status_code == 200:
-            comments += r.json()['results']['comments']
-        else:
-            break
-    return comments
+    return render_template('visualize_lda.html', clusters=clusters)

@@ -2,9 +2,9 @@
 
 {% macro render_tree(tree) -%}
     <ul class="thread">
-        {% for comment in tree %}
+        {% for comment, size in tree %}
             <li class="comment">
-                <h6>{{ comment.author }} [{{ comment.created_at.strftime('%Y-%m-%d %H:%M') }}]</h6>
+            <h6>{{ comment.author }} [{{ comment.created_at.strftime('%Y-%m-%d %H:%M') }}] ({{ size }} comments)</h6>
                 {{ comment.body|safe }}
             </li>
             {% if comment.replies|length > 0 %}
@@ -17,7 +17,6 @@
 {% block content %}
 
   <style>
-    @import url(http://fonts.googleapis.com/css?family=Libre+Baskerville:400,400italic,700|Source+Sans+Pro:400,700);
     html, body {
         font-family: "Libre Baskerville", serif;
         background: #eaeaea;
