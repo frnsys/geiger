@@ -29,7 +29,7 @@ Sentence = namedtuple('Sentence', ['text', 'aspects', 'parent'])
 def summarize_aspects(comments, strategy='pos_tag'):
     sents = []
     for c in comments:
-        sents += [sent for sent in extract_aspects(c)]
+        sents += [sent for sent in extract_aspects(c, strategy)]
 
     # Calculate support for each aspect.
     counts = {}
@@ -51,8 +51,11 @@ def summarize_aspects(comments, strategy='pos_tag'):
             aspects[aspect].append(sent)
 
     # Pick a random sentence for each aspect.
+    results = []
     for aspect, sents in aspects.items():
-        print('[{0}] {1}'.format(aspect, random.choice(sents).text))
+        # NOTE here the support value is not the # of comments, but the # of sentences.
+        results.append((random.choice(sents).text, counts[aspect]))
+    return results
 
 
 def extract_aspects(comment, strategy='pos_tag'):

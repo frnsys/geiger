@@ -1,33 +1,33 @@
 from flask import Flask, render_template
 
 import config
-from geiger import highlights, services, examine
+from geiger import services
+from compare import compare
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 
 
-@app.route('/geiger', defaults={'url': ''})
+@app.route('/geiger', defaults={'url': None})
 @app.route('/geiger/<path:url>')
 def geiger(url):
-    asset = services.get_asset(url)['result']
+    if url is not None:
+        asset = services.get_asset(url)['result']
 
-    if asset is None:
-        raise Exception('Couldn\'t find an asset matching the url {0}'.format(url))
-    elif 'article' in asset:
-        body = asset['article']['body']
-    elif 'blogpost' in asset:
-        body = asset['blogpost']['post_content']
+        if asset is None:
+            raise Exception('Couldn\'t find an asset matching the url {0}'.format(url))
+        elif 'article' in asset:
+            body = asset['article']['body']
+        elif 'blogpost' in asset:
+            body = asset['blogpost']['post_content']
+        else:
+            raise Exception('Unrecognized asset')
+
     else:
-        raise Exception('Unrecognized asset')
+        body = '(using example data)'
 
-    comments = services.get_comments(url, n=300)
+    results = [(strat, result) for strat, result in compare(url)]
 
-    comments, stats = highlights(comments,
-                            min_size=config.min_cluster_size,
-                            dist_cutoff=config.distance_cutoff)
-    comments.sort(key=lambda c: c[0].score, reverse=True)
-
-    return render_template('index.html', url=url, subject=body, comments=comments, stats=stats)
+    return render_template('index.html', url=url, subject=body, results=results)
 
 @app.route('/visualize/<path:url>')
 def visualize(url):

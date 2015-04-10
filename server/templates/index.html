@@ -14,6 +14,17 @@
     </ul>
 {%- endmacro %}
 
+{% macro render_highlights(highlights) -%}
+    <ul class="thread">
+        {% for sentence, support in highlights %}
+            <li class="comment">
+                <h6>{{ support }} comments</h6>
+                {{ sentence }}
+            </li>
+        {% endfor %}
+    </ul>
+{%- endmacro %}
+
 {% block content %}
 
   <style>
@@ -71,7 +82,10 @@
     {{ subject|safe }}
 </div>
 <div class="comments">
-    {{ render_tree(comments) }}
+    {% for strat, highlights in results %}
+        <h2>{{ strat }}</h2>
+        {{ render_highlights(highlights) }}
+    {% endfor %}
 </div>
 
 {% endblock %}

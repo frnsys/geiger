@@ -8,12 +8,17 @@ class Featurizer():
     """
 
     def __init__(self, n_topics=None):
+        self.trained = False
         self.m = lda.Model(n_topics=n_topics)
 
     def featurize(self, comments, return_ctx=False):
-        self.m.train(comments)
-        topic_dists = self.m.topic_dists
+        if not self.trained:
+            self.m.train(comments)
+            topic_dists = self.m.topic_dists
+        else:
+            topic_dists = self.m.featurize([c.body for c in comments])
 
+        self.trained = True
         if return_ctx:
             return topic_dists, topic_dists
         else:

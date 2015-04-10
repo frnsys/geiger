@@ -2,7 +2,7 @@
 
 (work in progress)
 
-Currently, the IHAC clustering strategy relies on my implementation of IHAC in [galaxy](https://github.com/ftzeng/galaxy) which is still kind of finicky.
+The IHAC clustering strategy relies on my implementation of IHAC in [galaxy](https://github.com/ftzeng/galaxy) which is still kind of finicky.
 
 
 ## Usage
@@ -22,6 +22,8 @@ Run the server:
 Then try out a NYT article:
 
     localhost:5001/geiger/<NYT article url>
+
+This will output the selections from a variety of different strategies.
 
 To visualize the output of a clustering strategy (for debugging/tweaking purposes):
 
@@ -45,8 +47,7 @@ Clustering strategies other than LDA use these features to generate clusters.
 
 ## To Do
 
-- clean up
 - figure out how to evaluate/compare approaches
 - other ways of filtering out sentences? In general, look for cues which reference context beyond the sentence itself. For example:
     - non-"I" pronouns
-    - starting with terms like "However", "For example", etc
+    - starting with terms like "However", "For example", "(", "So", etc

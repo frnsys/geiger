@@ -4,17 +4,24 @@ from scipy import sparse
 from sklearn import preprocessing
 
 
+# For development, cache featurizers are part of the module.
+# If we start running this as part of a server, then we can't do this;
+# we would need featurizers for each article instead.
+featurizers = []
+scalr = None
+for name, kwargs in config.featurizers.items():
+    path = '{0}.{1}'.format(__name__, name)
+    mod = importlib.import_module(path)
+    featurizers.append(mod.Featurizer(**kwargs))
+
 def featurize(comments, return_ctx=False):
     """
     Featurizes a list of comments according to the config.
     """
-    scalr = preprocessing.StandardScaler()
-
+    global scalr
     feats = []
-    for name, kwargs in config.featurizers.items():
-        path = '{0}.{1}'.format(__name__, name)
-        mod = importlib.import_module(path)
-        feats.append(mod.Featurizer(**kwargs).featurize(comments, return_ctx=return_ctx))
+    for featurizer in featurizers:
+        feats.append(featurizer.featurize(comments, return_ctx=return_ctx))
 
     # Extract the context for each comment.
     # This is a dictionary mapping of feature names
@@ -30,7 +37,12 @@ def featurize(comments, return_ctx=False):
         feats = [f[0] for f in feats]
 
     feats = sparse.hstack(feats)
-    feats = scalr.fit_transform(feats.todense())
+
+    if scalr is None:
+        scalr = preprocessing.StandardScaler()
+        feats = scalr.fit_transform(feats.todense())
+    else:
+        feats = scalr.transform(feats.todense())
 
     # Attach features to comments for re-use later.
     for i, c in enumerate(comments):

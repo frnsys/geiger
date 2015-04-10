@@ -3,40 +3,6 @@ from nltk import sent_tokenize
 from scipy.spatial.distance import cdist
 from geiger.featurizers import featurize
 
-def select_sentences(clusters):
-    """
-    Extract representative sentences from a list of Comment clusters.
-
-    Current strategy:
-
-        - for each cluster
-            - calculate centroid (mean)
-            - for each comment
-                - tokenize into sentences
-                - for each sentence
-                    - calculate relevancy to parent cluster
-                        - few diff options
-                            - aspect-based
-                                - identify aspects (noun phrases or keywords)
-                                - calculate support for each aspect
-                                    (i.e. what fraction of other sentences mention it?)
-                            - topic-based (if using LDA for clustering)
-                                - use topic model for comments and identify topic for sentence
-                                - relevancy = probability of assignment to parent cluster topic
-                            - distance (this may work well with doc2vec)
-                                - featurize sentence
-                                - calculate distance to centroid
-            - select sentence with greatest relevancy
-
-    Can control for other factors too:
-
-        - skip sentences with a non-"I" pronoun
-        - skip sentences below some threshold length
-    """
-    #for clus in clusters:
-        #np.mean
-        #for comment in clus:
-            #for sent in sent_toknize(comment.body):
 
 class Sentence():
     def __init__(self, body):
@@ -47,19 +13,31 @@ def extract_by_distance(clusters, top_n=5):
     """
     For each cluster, calculate a centroid vector (mean of its children's feature vectors),
     then select the sentence closest to the centroid.
-
-    TO DO not working
     """
+    results = []
     for clus in clusters:
+        # Calculate centroid for the cluster.
         agg_feats = np.vstack([c.features for c in clus])
-        print(agg_feats.shape)
         centroid = np.array([ np.mean(agg_feats, axis=0) ])
-        print(centroid.shape)
+
+        # Calculate features for each sentence in the cluster.
+        feats = []
+        sents = []
         for comment in clus:
-            feats = featurize([Sentence(sent) for sent in sent_tokenize(comment.body)])
-            print(feats.shape)
-            dists = cdist(centroid, feats, metric='cosine')
-            print(dists)
+            sents += [Sentence(sent) for sent in sent_tokenize(comment.body) if len(sent) >= 10]
+        feats = featurize(sents)
+
+        # Calculate distances to the centroid.
+        dists = cdist(centroid, feats, metric='cosine')
+
+        # Select the closest sentence.
+        i = np.argmin(dists)
+        results.append(sents[i].body)
+
+    sizes = np.array([len(clus) for clus in clusters])
+    max_idx = np.argpartition(sizes, -top_n)[-top_n:]
+
+    return [(results[i], sizes[i]) for i in max_idx]
 
 
 def extract_by_topics(clusters, lda, top_n=5):

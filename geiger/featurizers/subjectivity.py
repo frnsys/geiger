@@ -62,11 +62,11 @@ class Featurizer():
         #feats = np.vstack([self._featurize(c.body) for c in comments])
 
         p = Progress('SUBJ')
-        n = len(comments) - 1
+        n = len(comments)
 
         feats = []
         for i, c in enumerate(comments):
-            p.print_progress(i/n)
+            p.print_progress((i+1)/n)
             feats.append(self._featurize(c.body))
         feats = np.vstack(feats)
 

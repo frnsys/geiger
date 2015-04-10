@@ -86,6 +86,13 @@ class Model():
             proba = doc_topic[i][topic]
             yield doc, topic, proba
 
+    def featurize(self, docs):
+        """
+        Return topic vectors for documents.
+        """
+        vecs = self.vectr.transform(docs)
+        return self.m.transform(vecs.toarray())
+
     @property
     def topic_dists(self):
         return self.m.doc_topic_
