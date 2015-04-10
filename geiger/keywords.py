@@ -1,4 +1,4 @@
-# From: https://github.com/zelandiya/RAKE-tutorial/blob/master/rake.py
+# From: <https://github.com/zelandiya/RAKE-tutorial/blob/master/rake.py>
 # Under the MIT License.
 # Implementation of RAKE - Rapid Automtic Keyword Exraction algorithm
 # as described in:

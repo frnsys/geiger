@@ -1,4 +1,3 @@
-from geiger.text import strip_tags
 from geiger.models import lda
 
 class Featurizer():
@@ -12,7 +11,7 @@ class Featurizer():
         self.m = lda.Model(n_topics=n_topics)
 
     def featurize(self, comments, return_ctx=False):
-        self.m.train([strip_tags(c.body) for c in comments])
+        self.m.train(comments)
         topic_dists = self.m.topic_dists
 
         if return_ctx:

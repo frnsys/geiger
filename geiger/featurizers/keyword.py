@@ -1,4 +1,4 @@
-from geiger.text import Vectorizer, strip_tags
+from geiger.text import Vectorizer
 from geiger.keywords import Rake
 
 class Featurizer():
@@ -20,7 +20,7 @@ class Featurizer():
         key_docs = []
         pseudo_docs = []
         for c in comments:
-            keys = r.run(strip_tags(c.body))
+            keys = r.run(c.body)
             # We are using cosine distance for our metric, which cannot handle empty vectors.
             # If we are using JUST these keyword docs, it's possible we have zero vectors,
             # in which case just make a pseudo-pseudo doc :)

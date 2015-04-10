@@ -5,15 +5,15 @@ from sklearn.externals import joblib
 import config
 from server import app
 
+from geiger.models.doc2vec import Model as Doc2Vec
 
-def train():
+
+def train_doc2vec():
     """
-    Train the models.
+    Train the doc2vec model.
     """
-    pass
-    #senti_data =
-    #senti_m = sentiment.Model()
-    #senti_m.train(X, y)
+    m = Doc2Vec()
+    m.train('data/commentBodies.txt')
 
 
 def server():
@@ -59,7 +59,7 @@ def eval():
             docs.append(Doc(doc))
             labels.append(i)
 
-    from geiger.evaluate import evaluate
+    from geiger.util.evaluate import evaluate
     print(evaluate(docs, labels))
 
 

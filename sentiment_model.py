@@ -13,7 +13,7 @@ import os
 import numpy as np
 import pandas as pd
 from geiger.text import strip_tags
-from geiger.featurizers import opinion, subjectivity
+from geiger.featurizers import opinion, subjectivity, doc2vec
 from sklearn.cross_validation import train_test_split
 from sklearn import linear_model
 from sklearn import metrics
@@ -135,6 +135,7 @@ def _load_congress(path):
 def main():
     opinion_f = opinion.Featurizer()
     subject_f = subjectivity.Featurizer()
+    d2v_f = doc2vec.Featurizer()
 
     class Doc():
         def __init__(self, doc):
@@ -150,7 +151,9 @@ def main():
     opinion_feats = opinion_f.featurize(docs)
     print('Building subjectivity features...')
     subject_feats = subject_f.featurize(docs)
-    X = np.hstack([opinion_feats, subject_feats])
+    print('Building doc2vec features...')
+    doc2vec_feats = d2v_f.featurize(docs)
+    X = np.hstack([opinion_feats, subject_feats, doc2vec_feats])
 
     X_train, X_test, y_train, y_test = train_test_split(X, labels, test_size=0.2)
 

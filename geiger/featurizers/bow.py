@@ -1,4 +1,5 @@
-from geiger.text import Vectorizer, strip_tags
+from geiger.text import Vectorizer
+
 
 class Featurizer():
     """
@@ -7,9 +8,9 @@ class Featurizer():
     def __init__(self):
         pass
 
-    def featurize(self, comments, return_ctx = False):
+    def featurize(self, comments, return_ctx=False):
         v = Vectorizer()
-        vecs = v.vectorize([strip_tags(c.body) for c in comments], train=True)
+        vecs = v.vectorize([c.body for c in comments], train=True)
 
         if return_ctx:
             return vecs, vecs

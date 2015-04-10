@@ -36,9 +36,51 @@ def visualize(url):
 
     return render_template('visualize.html', comments=comments, tree=tree, stats=stats, url=url)
 
-@app.route('/visualize_lda')
-def visualize_lda():
-    from run_lda import main
-    clusters = main()
 
-    return render_template('visualize_lda.html', clusters=clusters)
+import json
+from geiger.text import strip_tags
+from geiger import clustering
+@app.route('/visualize_strat/<strategy>')
+def visualize_strat(strategy):
+    path_to_examples = 'data/examples.json'
+    clusters = json.load(open(path_to_examples, 'r'))
+    docs = []
+    for clus in clusters:
+        for doc in clus:
+            docs.append(doc)
+
+    docs = [strip_tags(doc) for doc in docs if len(doc) >= 140] # drop short comments :D
+
+    class FauxComment():
+        def __init__(self, body):
+            self.body = body
+
+    comments = [FauxComment(d) for d in docs]
+
+    if strategy == 'lda':
+        clusters = clustering.lda(comments)
+    elif strategy == 'hac':
+        clusters = clustering.hac(comments)
+    elif strategy == 'ihac':
+        clusters = clustering.ihac(comments)
+    elif strategy == 'k_means':
+        clusters = clustering.k_means(comments)
+
+    return render_template('visualize_strat.html', clusters=clusters)
+
+
+@app.route('/visualize_strat/<strategy>/<path:url>')
+def visualize_strat_url(strategy, url):
+    comments = services.get_comments(url, n=300)
+    comments = [c for c in comments if len(c.body) > 140]
+
+    if strategy == 'lda':
+        clusters = clustering.lda(comments)
+    elif strategy == 'hac':
+        clusters = clustering.hac(comments)
+    elif strategy == 'ihac':
+        clusters = clustering.ihac(comments)
+    elif strategy == 'k_means':
+        clusters = clustering.k_means(comments)
+
+    return render_template('visualize_strat.html', clusters=clusters)

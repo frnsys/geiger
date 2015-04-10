@@ -1,14 +1,14 @@
 """
-Handles vectorizing of documents.
+For manipulating text.
 """
 
 import string
+from html.parser import HTMLParser
 
 from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer, HashingVectorizer
 from sklearn.decomposition import TruncatedSVD
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import Normalizer
-
 from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.stem.wordnet import WordNetLemmatizer
 from nltk.corpus import stopwords
@@ -93,9 +93,6 @@ class Tokenizer():
         return tokens
 
 
-
-from html.parser import HTMLParser
-
 class MLStripper(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -123,7 +120,7 @@ def html_decode(s):
     """
     Returns the ASCII decoded version of the given HTML string. This does
     NOT remove normal HTML tags like <p>.
-    from: <http://stackoverflow.com/a/275246/1097920
+    from: <http://stackoverflow.com/a/275246/1097920>
     """
     for code in (
             ("'", '&#39;'),

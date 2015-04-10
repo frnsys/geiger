@@ -5,7 +5,6 @@ Geiger clusters comments to generate a _gist_ of what's happening.
 import numpy as np
 from scipy import sparse
 from galaxy.cluster.ihac import Hierarchy
-from sklearn.externals import joblib
 from statistics import mode, StatisticsError
 from geiger.featurizers import featurize
 

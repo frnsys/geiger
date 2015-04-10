@@ -2,9 +2,9 @@
 
 {% macro render_comment(c) -%}
     <li class="node comment">
-        <p class="body">{{ c|safe|truncate(70) }}</p>
+        <p class="body">{{ c.body_html|safe|truncate(70) }}</p>
         <ul class="context">
-            <li>{{ c|safe }}</li>
+            <li>{{ c.body_html|safe }}</li>
         </ul>
     </li>
 {%- endmacro %}

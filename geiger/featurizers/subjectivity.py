@@ -1,7 +1,7 @@
+import numpy as np
 from textblob import Blobber
 from textblob_aptagger import PerceptronTagger
-from geiger.text import strip_tags
-import numpy as np
+from geiger.util.progress import Progress
 
 class Featurizer():
     """
@@ -60,11 +60,16 @@ class Featurizer():
 
     def featurize(self, comments, return_ctx=False):
         #feats = np.vstack([self._featurize(c.body) for c in comments])
+
+        p = Progress('SUBJ')
+        n = len(comments) - 1
+
         feats = []
         for i, c in enumerate(comments):
-            print('Featurizing comment {0}/{1}...'.format(i, len(comments)))
+            p.print_progress(i/n)
             feats.append(self._featurize(c.body))
         feats = np.vstack(feats)
+
         if return_ctx:
             return feats, feats
         else:
@@ -74,7 +79,7 @@ class Featurizer():
         """
         Featurize a single document.
         """
-        tagged = self.blobber(strip_tags(text)).tags
+        tagged = self.blobber(text).tags
 
         n_strong = 0
         n_weak = 0

@@ -2,8 +2,12 @@ import random
 from collections import namedtuple
 from nltk import pos_tag, word_tokenize, sent_tokenize, RegexpParser
 from nltk.corpus import stopwords
-from geiger.text import strip_tags
 from geiger.keywords import Rake
+
+"""
+The code for the NLTK noun phrase aspect extraction strategy is adapted from Jeffrey Fossett:
+<https://github.com/Fossj117/opinion-mining/blob/master/classes/transformers/asp_extractors.py>
+"""
 
 # Grammar for NP chunking
 GRAMMAR = r"""
@@ -60,7 +64,7 @@ def extract_aspects(comment, strategy='pos_tag'):
         | strategy      -- str, specify how aspects will be extracted.
                             Options are ['pos_tag', 'rake'].
     """
-    for sent in sent_tokenize(strip_tags(comment.body)):
+    for sent in sent_tokenize(comment.body):
         if strategy == 'rake':
             # Should we keep the keyword scores?
             # May need to strip puncuation here...getting "don" instead of "don't"

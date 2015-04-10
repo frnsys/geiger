@@ -32,6 +32,10 @@ def featurize(comments, return_ctx=False):
     feats = sparse.hstack(feats)
     feats = scalr.fit_transform(feats.todense())
 
+    # Attach features to comments for re-use later.
+    for i, c in enumerate(comments):
+        c.features = feats[i]
+
     if return_ctx:
         return feats, ctx
     else:

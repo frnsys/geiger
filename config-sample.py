@@ -23,6 +23,7 @@ featurizers = {
     'keyword': {},
     'subjectivity': {},
     'opinion': {},
+    'doc2vec': {},
     'topics': {
         'n_topics': 10
     }
@@ -30,3 +31,4 @@ featurizers = {
 
 # Where trained models are stored
 models_path = 'data/'
+d2v_path = 'data/comments.doc2vec'

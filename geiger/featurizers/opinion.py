@@ -7,7 +7,7 @@ from nltk import word_tokenize
 # See <http://stevenloria.com/tutorial-state-of-the-art-part-of-speech-tagging-in-textblob/>.
 from textblob import Blobber
 from textblob_aptagger import PerceptronTagger
-from geiger.text import strip_tags
+from geiger.util.progress import Progress
 
 """
 to do: put this in requirements.txt
@@ -57,11 +57,14 @@ class Featurizer():
         return lex
 
     def featurize(self, comments, return_ctx=False):
+        p = Progress('OPIN')
+        n = len(comments) - 1
+
         pos_feats = []
         lex_feats = []
         for i, c in enumerate(comments):
-            print('Featurizing comment {0}/{1}...'.format(i, len(comments)))
-            comment = strip_tags(c.body)
+            p.print_progress(i/n)
+            comment = c.body
             pos_feats.append(self.pos_featurize(comment))
             lex_feats.append(self.lex_featurize(comment))
 
