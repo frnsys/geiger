@@ -50,6 +50,6 @@ def baseline(comments):
     results = []
     for i in range(5):
         sel = random.choice(sents)
-        results.append((sel[0], sel[1], 0))
+        results.append((sel[0], sel[1], 0, []))
         sents.remove(sel)
     return results

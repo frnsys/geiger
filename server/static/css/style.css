@@ -21,6 +21,9 @@ header h1 {
 a, a:visited {
     color: #31708F;
 }
+li {
+    list-style-type: none;
+}
 .quote {
     font-weight: 700;
     font-size: 1.8em;
@@ -112,13 +115,27 @@ button {
 }
 
 .thread {
-    list-style-type: none;
     padding: 0;
 }
 .comment {
     padding: 1em 0;
+    position: relative;
 }
-.support {
+.cohort {
+    padding: 1em 2em;
+    background: #fafafa;
+    border: 1px solid #E5E5E5;
+}
+.cohort li {
+    padding: 1em 0;
+}
+.full-comment {
+    position: absolute;
+    background: #F6F6F6;
+    padding: 1em 2em;
+    z-index: 1;
+}
+.support, .support a {
     color: #C0C0C0;
     margin: 1em 0;
 }

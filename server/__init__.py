@@ -159,7 +159,8 @@ def geigerize():
                 'author': c.author,
                 'score': c.score
             },
-            'support': int(r[2])
+            'support': int(r[2]),
+            'cohort': [c.body for c in r[3]]
         })
 
     return jsonify(results=results)

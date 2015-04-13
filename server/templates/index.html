@@ -44,7 +44,9 @@
 <script type="text/html" id="highlight_tmpl">
     <li class="comment">
         <span class="quote">“</span><span class="ellipsis">... </span>{0}<span class="ellipsis"> ...</span><span class="quote">”</span>
-        <h6 class="support"><a href="#"><span>{1}</span></a> and <span>{2}</span> other commenters</h6>
+        <h6 class="support"><a href="#" class="author"><span>{1}</span></a> and <a href="#" class="commenters"><span>{2}</span> other commenters</a></h6>
+        <div class="full-comment hide">{3}</div>
+        <ul class="cohort hide">{4}</ul>
     </li>
 </script>
 
@@ -80,6 +82,25 @@
                 get_comments($(this).val());
             }
         });
+
+        // Show full comments on mouseenter of author name.
+        $('body').on('mouseenter', '.author', function() {
+            var parent = $(this).closest('.comment');
+            parent.find('.cohort').hide();
+            parent.find('.full-comment').show();
+        });
+
+        // Show cohort on mouseenter of support.
+        $('body').on('mouseenter', '.commenters', function() {
+            var parent = $(this).closest('.comment');
+            parent.find('.full-comment').hide();
+            parent.find('.cohort').show();
+        });
+
+        $('body').on('mouseleave', '.comment', function() {
+            $(this).find('.full-comment, .cohort').hide();
+        });
+
 
         // Run a single strategy.
         $('.run').on('click', function() {
@@ -134,9 +155,19 @@
                         thread = el.find('.thread');
                     for (var i=0; i < data.length; i++) {
                         var res = data[i],
-                            hel = $('#highlight_tmpl')
-                                    .html()
-                                    .format(res.sentence, res.comment.author, res.support);
+                            coh = '',
+                            hel;
+
+                        // List out the other sentences in this cohort.
+                        for (var j=0; j < res.cohort.length; j++) {
+                            coh += '<li>' + res.cohort[j] + '</li>';
+                        }
+
+                        // Build the highlight HTML.
+                        hel = $('#highlight_tmpl')
+                                .html()
+                                .format(res.sentence, res.comment.author, res.support, res.comment.body, coh);
+
                         thread.append(hel);
                     }
                 },

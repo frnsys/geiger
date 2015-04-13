@@ -20,7 +20,7 @@ def extract_by_distance(clusters, top_n=5):
 
     Returns a list of tuples:
 
-        [(sentence body, sentence comment, cluster size), ...]
+        [(sentence body, sentence comment, cluster size, cohort), ...]
 
     """
     results = []
@@ -46,7 +46,7 @@ def extract_by_distance(clusters, top_n=5):
     sizes = np.array([len(clus) for clus in clusters])
     max_idx = np.argpartition(sizes, -top_n)[-top_n:]
 
-    return [(results[i].body, results[i].comment, sizes[i]) for i in max_idx]
+    return [(results[i].body, results[i].comment, sizes[i], clusters[i]) for i in max_idx]
 
 
 def extract_by_topics(clusters, lda, top_n=5):
@@ -71,7 +71,7 @@ def extract_by_topics(clusters, lda, top_n=5):
 
     Returns a list of tuples:
 
-        [(sentence body, sentence comment, cluster size), ...]
+        [(sentence body, sentence comment, cluster size, cohort), ...]
 
     """
     results = []
@@ -95,7 +95,7 @@ def extract_by_topics(clusters, lda, top_n=5):
     sizes = np.array([len(clus) for clus in clusters])
     max_idx = np.argpartition(sizes, -top_n)[-top_n:]
 
-    return [(results[i].body, results[i].comment, sizes[i]) for i in max_idx]
+    return [(results[i].body, results[i].comment, sizes[i], clusters[i]) for i in max_idx]
 
 
 def extract_by_aspects(comments, strategy='pos_tag'):
@@ -108,9 +108,10 @@ def extract_by_aspects(comments, strategy='pos_tag'):
 
     Returns a list of tuples:
 
-        [(sentence body, sentence comment, support), ...]
+        [(sentence body, sentence comment, support, cohort), ...]
 
     Note: here the support value is not the # of comments, but the # of sentences.
+    and the cohort consists of sentences, not comments.
 
     TO DO don't pick sentences randomly, rank them in some way.
     """
@@ -142,7 +143,7 @@ def extract_by_aspects(comments, strategy='pos_tag'):
     results = []
     for aspect, sents in aspects.items():
         sent = random.choice(sents)
-        results.append((sent.body, sent.comment, counts[aspect]))
+        results.append((sent.body, sent.comment, counts[aspect], sents))
     return results
 
 
@@ -153,9 +154,10 @@ def extract_by_apriori(comments, min_sup=0.05):
 
     Returns a list of tuples:
 
-        [(sentence body, sentence comment, support), ...]
+        [(sentence body, sentence comment, support, cohort), ...]
 
-    Note: here the support value is not the # of comments, but the # of sentences.
+    Note: here the support value is not the # of comments, but the # of sentences,
+    and the cohort consists of sentences, not comments.
 
     TO DO tweak `min_sup` param, for small amounts of comments (<=100), may be hard
     to identify proper aspects.
@@ -185,5 +187,5 @@ def extract_by_apriori(comments, min_sup=0.05):
     results = []
     for aspect, sents in aspect_sents.items():
         sent = random.choice(sents)
-        results.append((sent.body, sent.comment, counts[aspect]))
+        results.append((sent.body, sent.comment, counts[aspect], sents))
     return results
