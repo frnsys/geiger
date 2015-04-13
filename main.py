@@ -13,7 +13,11 @@ def train_doc2vec():
     Train the doc2vec model.
     """
     m = Doc2Vec()
-    m.train('data/commentBodies.txt')
+    m.train([
+        'data/all_approved_comments_01.csv',
+        'data/all_approved_comments_02.csv',
+        'data/all_approved_comments_03.csv'
+    ])
 
 
 def server():

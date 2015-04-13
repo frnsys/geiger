@@ -31,7 +31,7 @@ class Model():
             # Or is it worthwhile to continue updating word representations?
             self.m.train_words = False
 
-    def train(self, data_path):
+    def train(self, data_paths):
         """
         Training
         ~~~~~~~~
@@ -65,7 +65,7 @@ class Model():
         print('Training model...')
         t0 = time()
         self.m = Doc2Vec(
-                sentences=self._doc_stream(data_path),
+                sentences=self._doc_stream(data_paths),
                 train_lbls=False,       # only train word representations
                 workers=5,              # multithreading
                 min_count=50,           # ignore words with frequency less than this
@@ -97,23 +97,28 @@ class Model():
 
         doc = doc.translate(self.period_map)
         doc = doc.translate(self.punct_map)
-        return word_tokenize(doc)
+        return word_tokenize(doc.lower())
 
 
-    def _doc_stream(self, path):
+    def _doc_stream(self, paths):
         """
         A generator to return processed documents (comments).
         """
         p = Progress('DOC2VEC')
-        n = sum(1 for line in open(path, 'r'))
-        print('Using {0} documents.'.format(n))
-        n -= 1 # To compensate for zero-indexed i
 
-        with open(path, 'r') as f:
-            for i, line in enumerate(f):
-                p.print_progress(i/n)
-                tokens = self._tokenize(line)
-                yield LabeledSentence(tokens, labels=['DOC_{0}'.format(i)])
+        n = 0
+        for path in paths:
+            n += sum(1 for line in open(path, 'r'))
+        print('Using {0} documents.'.format(n))
+
+        i = 0
+        for path in paths:
+            with open(path, 'r') as f:
+                for line in f:
+                    i += 1
+                    p.print_progress(i/n)
+                    tokens = self._tokenize(line)
+                    yield LabeledSentence(tokens, labels=['DOC_{0}'.format(i)])
 
 
     def infer_vector(self, doc):

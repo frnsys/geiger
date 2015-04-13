@@ -14,10 +14,24 @@ doc3 = '''
 So will the AMA step up and pull the licenses of these corrupt physicians since the FDA is so polluted by conflicts of interests in this area that they are frozen?  Senator Hatchett Job should be investigated as a part of this overt fraud, along with his Hatchling.  Is every GOP Senator corrupted by something?  Really sick that our legislators are allowed to take our money for fair services and use them strictly to enrich themselves.
 '''
 
+from gensim.models.doc2vec import Doc2Vec
+
 m = Doc2Vec()
+print(dir(m))
+print(type(m))
+
+m = Doc2Vec.load_word2vec_format('/Users/ftseng/Downloads/GoogleNews-vectors-negative300.bin', binary=True)
+print(dir(m))
+print(type(m))
 vec1 = m.infer_vector(strip_tags(doc1))
 vec2 = m.infer_vector(strip_tags(doc2))
 vec3 = m.infer_vector(strip_tags(doc3))
+
+
+#m = Doc2Vec()
+#vec1 = m.infer_vector(strip_tags(doc1))
+#vec2 = m.infer_vector(strip_tags(doc2))
+#vec3 = m.infer_vector(strip_tags(doc3))
 
 dist1 = euclidean(vec1, vec2)
 dist2 = cosine(vec1, vec2)

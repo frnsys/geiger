@@ -1,18 +1,26 @@
+import random
 import numpy as np
 from nltk import sent_tokenize
 from scipy.spatial.distance import cdist
 from geiger.featurizers import featurize
+from geiger.aspects import extract_aspects
 
 
 class Sentence():
-    def __init__(self, body):
+    def __init__(self, body, comment):
         self.body = body
+        self.comment = comment
 
 
 def extract_by_distance(clusters, top_n=5):
     """
     For each cluster, calculate a centroid vector (mean of its children's feature vectors),
     then select the sentence closest to the centroid.
+
+    Returns a list of tuples:
+
+        [(sentence body, sentence comment, cluster size), ...]
+
     """
     results = []
     for clus in clusters:
@@ -24,7 +32,7 @@ def extract_by_distance(clusters, top_n=5):
         feats = []
         sents = []
         for comment in clus:
-            sents += [Sentence(sent) for sent in sent_tokenize(comment.body) if len(sent) >= 10]
+            sents += [Sentence(sent, comment) for sent in sent_tokenize(comment.body) if len(sent) >= 10]
         feats = featurize(sents)
 
         # Calculate distances to the centroid.
@@ -32,12 +40,12 @@ def extract_by_distance(clusters, top_n=5):
 
         # Select the closest sentence.
         i = np.argmin(dists)
-        results.append(sents[i].body)
+        results.append(sents[i])
 
     sizes = np.array([len(clus) for clus in clusters])
     max_idx = np.argpartition(sizes, -top_n)[-top_n:]
 
-    return [(results[i], sizes[i]) for i in max_idx]
+    return [(results[i].body, results[i].comment, sizes[i]) for i in max_idx]
 
 
 def extract_by_topics(clusters, lda, top_n=5):
@@ -59,6 +67,11 @@ def extract_by_topics(clusters, lda, top_n=5):
         | clusters      -- list of clusters
         | lda           -- the LDA model built on the
                             comments in the clusters
+
+    Returns a list of tuples:
+
+        [(sentence body, sentence comment, cluster size), ...]
+
     """
     results = []
     for topic, clus in enumerate(clusters):
@@ -70,7 +83,7 @@ def extract_by_topics(clusters, lda, top_n=5):
             sents = [sent for sent in sents if len(sent) > 100]
 
             # Select only sentences which are congruous with the parent topic.
-            clus_sents += [(sent, prob) for sent, sent_topic, prob in lda.identify(sents) if sent_topic == topic]
+            clus_sents += [(Sentence(sent, comment), prob) for sent, sent_topic, prob in lda.identify(sents) if sent_topic == topic]
 
         # Select the relevant sentence with the highest probability.
         rep_sent = max(clus_sents, key=lambda c: c[1])
@@ -81,6 +94,51 @@ def extract_by_topics(clusters, lda, top_n=5):
     sizes = np.array([len(clus) for clus in clusters])
     max_idx = np.argpartition(sizes, -top_n)[-top_n:]
 
-    return [(results[i], sizes[i]) for i in max_idx]
+    return [(results[i].body, results[i].comment, sizes[i]) for i in max_idx]
 
 
+def extract_by_aspects(comments, strategy='pos_tag'):
+    """
+    Takes all comments, tries to identify the most commonly-discussed
+    aspects, and picks a random representative for each.
+
+    Note that the input here is not a list of clusters; rather it is
+    just a list of comments.
+
+    Returns a list of tuples:
+
+        [(sentence body, sentence comment, support), ...]
+
+
+    Note: here the support value is not the # of comments, but the # of sentences.
+    """
+    sents = []
+    for comment in comments:
+        sents += [Sentence(sent, comment) for sent in sent_tokenize(comment.body) if len(sent) >= 10]
+
+    # Calculate support for each aspect.
+    counts = {}
+    for sent in sents:
+        sent.aspects = extract_aspects(sent.body)
+        for aspect in sent.aspects:
+            if aspect not in counts:
+                counts[aspect] = 0
+            counts[aspect] += 1
+
+    # Sort and get top n aspects.
+    count_sorted = sorted(counts.items(), key=lambda c: c[1], reverse=True)
+    top_aspects = [k[0] for k in count_sorted[:5]]
+
+    # Find sentences for each aspect.
+    aspects = {k: [] for k in top_aspects}
+    for sent in sents:
+        overlap = set(sent.aspects).intersection(top_aspects)
+        for aspect in overlap:
+            aspects[aspect].append(sent)
+
+    # Pick a random sentence for each aspect.
+    results = []
+    for aspect, sents in aspects.items():
+        sent = random.choice(sents)
+        results.append((sent.body, sent.comment, counts[aspect]))
+    return results

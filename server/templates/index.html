@@ -1,91 +1,160 @@
 {% extends 'layout.html' %}
 
-{% macro render_tree(tree) -%}
-    <ul class="thread">
-        {% for comment, size in tree %}
-            <li class="comment">
-            <h6>{{ comment.author }} [{{ comment.created_at.strftime('%Y-%m-%d %H:%M') }}] ({{ size }} comments)</h6>
-                {{ comment.body|safe }}
-            </li>
-            {% if comment.replies|length > 0 %}
-                {{ render_tree(comment.replies) }}
-            {% endif %}
-        {% endfor %}
-    </ul>
-{%- endmacro %}
-
-{% macro render_highlights(highlights) -%}
-    <ul class="thread">
-        {% for sentence, support in highlights %}
-            <li class="comment">
-                <h6>{{ support }} comments</h6>
-                {{ sentence }}
-            </li>
-        {% endfor %}
-    </ul>
-{%- endmacro %}
-
 {% block content %}
-
-  <style>
-    html, body {
-        font-family: "Libre Baskerville", serif;
-        background: #eaeaea;
-        color: #222;
-    }
-
-    .subject, .comments {
-        max-width: 720px;
-        padding: 4em;
-        margin: 0 auto;
-    }
-    .subject {
-        background: #fff;
-        margin: 4em auto;
-        font-size: 0.8em;
-        line-height: 1.5;
-        box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.05);
-    }
-
-    .thread {
-        list-style-type: none;
-        padding: 0;
-    }
-    .comment {
-        font-family: "Source Sans Pro", serif;
-        margin: 2em 0 0 0;
-        padding: 2em;
-        background: #fff;
-        box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.05);
-    }
-    .comment h6 {
-        margin-top: 0;
-    }
-    .thread .thread {
-        padding-left: 2em;
-    }
-    .thread .thread .comment {
-        margin-top: 1px;
-    }
-
-    .url {
-        font-family: "Source Sans Pro", serif;
-        text-align: center;
-    }
-  </style>
-
-<div class="url">
-    <a href="{{ url }}">{{ url }}</a>
-</div>
+<header class="primary-header">
+    <h1>Geiger</h1>
+    <input type="text" class="url" placeholder="(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧ Enter a url to a NYT article w/ comments" />
+</header>
 
 <div class="subject">
-    {{ subject|safe }}
+    <div class="loading">
+        <div class="loader hide"></div>
+        <h4>Loading article...</h4>
+    </div>
+    <div class="error hide"></div>
+    <h1 class="subject--title"></h1>
+    <div class="subject--body"></div>
 </div>
 <div class="comments">
-    {% for strat, highlights in results %}
-        <h2>{{ strat }}</h2>
-        {{ render_highlights(highlights) }}
+    <div class="featurizers">
+        <h3>Active Featurizers</h3>
+        <ul>
+            {% for featurizer, params in featurizers.items() %}
+                <li>{{ featurizer }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    {% for strat in strategies %}
+        <div class="strategy hide" data-strategy="{{ strat }}">
+            <header>
+                <h2>{{ strat }}</h2>
+                <div class="controls">
+                    <button class="run" data-strategy="{{ strat }}">run</button>
+                    <div class="loader hide"></div>
+                    <div class="error hide"></div>
+                </div>
+            </header>
+            <ul class="thread"></ul>
+        </div>
     {% endfor %}
 </div>
+
+
+<script type="text/html" id="highlight_tmpl">
+    <li class="comment">
+        <span class="quote">“</span><span class="ellipsis">... </span>{0}<span class="ellipsis"> ...</span><span class="quote">”</span>
+        <h6 class="support"><a href="#"><span>{1}</span></a> and <span>{2}</span> other commenters</h6>
+    </li>
+</script>
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+<script type="text/javascript">
+    // ugh, javascript
+    if (!String.prototype.format) {
+      String.prototype.format = function() {
+        var args = arguments;
+        return this.replace(/{(\d+)}/g, function(match, number) {
+          return typeof args[number] != 'undefined'
+            ? args[number]
+            : match
+          ;
+        });
+      };
+    }
+
+    $(function() {
+        var comments;
+
+        // By default, just load example data.
+        get_comments('');
+
+        // Submit an NYT article url to load.
+        // This only works on the NYT internal network :(
+        $('input.url').on('keypress', function(ev) {
+            // Enter
+            if (ev.keyCode == 13) {
+                disable_geiger();
+                $('.subject--title, .subject--body').empty();
+                get_comments($(this).val());
+            }
+        });
+
+        // Run a single strategy.
+        $('.run').on('click', function() {
+            var strat = $(this).data('strategy');
+            geiger(strat);
+            $(this).hide();
+            $(this).siblings('.loader').show();
+        });
+
+        // Load data for an NYT url.
+        function get_comments(url) {
+            $('.subject .error').hide();
+            $('.subject .loading').show();
+            $.ajax('/api/comments', {
+                method: 'GET',
+                accepts: 'application/json',
+                data: {
+                    url: url
+                },
+                error: function(xhr, status, err) {
+                    $('.subject .error').text(err).show();
+                },
+                success: function(data, status, xhr) {
+                    comments = data.comments;
+                    $('.subject--title').text(data.title);
+                    $('.subject--body').html(data.body);
+                    enable_geiger();
+                },
+                complete: function() {
+                    $('.subject .loading').hide();
+                }
+            });
+        }
+
+        // Call a highlight strategy from the API.
+        function geiger(strat) {
+            var el = $('.strategy[data-strategy={0}]'.format(strat));
+            $.ajax('/api/geiger', {
+                method: 'POST',
+                accepts: 'application/json',
+                contentType: 'application/json',
+                dataType: 'json',
+                data: JSON.stringify({
+                    comments: comments,
+                    strategy: strat
+                }),
+                error: function(xhr, status, err) {
+                    el.find('.error').text(err).show();
+                },
+                success: function(data, status, xhr) {
+                    var data = data.results,
+                        thread = el.find('.thread');
+                    for (var i=0; i < data.length; i++) {
+                        var res = data[i],
+                            hel = $('#highlight_tmpl')
+                                    .html()
+                                    .format(res.sentence, res.comment.author, res.support);
+                        thread.append(hel);
+                    }
+                },
+                complete: function() {
+                    el.find('.loader').hide();
+                }
+            });
+        }
+
+        function enable_geiger() {
+            $('.strategy, .run').show();
+            $('.strategy .loader, .strategy .error').hide();
+        }
+        function disable_geiger() {
+            $('.strategy').hide();
+            $('.strategy .thread').empty();
+        }
+    });
+</script>
 
 {% endblock %}

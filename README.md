@@ -19,9 +19,9 @@ Run the server:
 
     $ python main.py server
 
-Then try out a NYT article:
+Then try out the demo:
 
-    localhost:5001/geiger/<NYT article url>
+    localhost:5001/
 
 This will output the selections from a variety of different strategies.
 
@@ -29,6 +29,15 @@ To visualize the output of a clustering strategy (for debugging/tweaking purpose
 
     localhost:5001/visualize_strat/[lda, hac, ihac, k_means]
     localhost:5001/visualize_strat/[lda, hac, ihac, k_means]/<NYT article url>
+
+
+### Recommendations
+
+It's recommended that you also run the `Doc2Vec` process:
+
+    $ python doc2vec.py
+
+The Doc2Vec model I'm using is huge and takes a really long time to load. The `doc2vec.py` script will run it as an independent process with a listener.
 
 
 ## Method
@@ -51,3 +60,5 @@ Clustering strategies other than LDA use these features to generate clusters.
 - other ways of filtering out sentences? In general, look for cues which reference context beyond the sentence itself. For example:
     - non-"I" pronouns
     - starting with terms like "However", "For example", "(", "So", etc
+    - does not start and end with quotes
+- write a chrome extension to mock the selections on a live NYT page

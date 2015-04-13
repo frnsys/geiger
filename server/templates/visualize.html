@@ -1,27 +1,11 @@
 {% extends 'layout.html' %}
 
-{% macro render_tree(tree) -%}
-    {% for node in tree %}
-        {# node tuple format is (id, avg distances, children) #}
-        {% if node[0] in comments.keys() %}
-            {{ render_comment(comments[node[0]]) }}
-        {% else %}
-            <li class="node cluster">
-                <h6>avg distance among children: {{ node[1] }}</h6>
-                <ul class="children">
-                    {{ render_tree(node[2]) }}
-                </ul>
-            </li>
-        {% endif %}
-    {% endfor %}
-{%- endmacro %}
-
-{% macro render_comment(c) -%}
+{% macro render_comment(c, ctx) -%}
     <li class="node comment">
-        <p class="body">{{ c['comment'].body|safe|truncate(70) }}</p>
+        <p class="body">{{ c.body_html|safe|truncate(70) }}</p>
         <ul class="context">
-            <li>{{ c['comment'].body|safe }}</li>
-            {% for k,v in c['context'].items() %}
+            <li>{{ c.body_html|safe }}</li>
+            {% for k,v in ctx.items() %}
                 <li><span class="featurizer">{{ k }}</span> : {{ v }}</li>
             {% endfor %}
         </ul>
@@ -31,22 +15,24 @@
 {% block content %}
 
 <style>
-html, body {
-    font-family: "Source Sans Pro", serif;
-}
 .node {
     position: relative;
 }
 .node .body {
     max-width: 120px;
-    background: #c3feff;
+    background: #DDFBF2;
     padding: 2em;
     white-space: normal;
+    border-radius: 0.4em;
+    margin: 0.5em;
+}
+.comment {
+    padding: 0;
 }
 .context {
     display: none;
     position: absolute;
-    background: #eaeaea;
+    background: #f0f0f0;
     font-size: 0.8em;
     z-index: 10;
     top: 1em;
@@ -57,7 +43,9 @@ html, body {
 }
 .cluster {
     padding: 2em;
-    border: 4px solid #7468FA;
+    border: 4px solid #31708F;
+    margin: 1em;
+    border-radius: 0.4em;
 }
 .context li {
     margin: 1em 0;
@@ -66,6 +54,10 @@ html, body {
     font-weight: bold;
     color: #4BD68D;
 }
+ul {
+    margin: 0;
+    padding: 0;
+}
 ul > li {
     vertical-align: top;
     display: inline-block;
@@ -73,23 +65,39 @@ ul > li {
 .url, .stats {
     text-align: center;
 }
+.select-strategy {
+    float: right;
+    margin: 0.5em;
+    font-size: 1.4em;
+}
 </style>
 
-<div class="url">
-    <a href="{{ url }}">{{ url }}</a>
-</div>
+<header class="primary-header">
+    <h1>Geiger</h1>
+    <select class="select-strategy">
+        {% for strat in strategies %}
+            {% if strat == strategy %}
+                <option selected value="/visualize/{{ strat }}/{{ url }}">{{ strat }}</option>
+            {% else %}
+                <option value="/visualize/{{ strat }}/{{ url }}">{{ strat }}</option>
+            {% endif %}
+        {% endfor %}
+    </select>
+</header>
 
-<ul class="stats">
-    {% for k,v in stats.items() %}
-        <li><span class="stat">{{ k }}</span> : {{ v }}</li>
+<ul class="tree">
+    {% for cluster in clusters %}
+        <li class="node cluster">
+            <ul class="children">
+                {% for comment, ctx in cluster %}
+                    {{ render_comment(comment, ctx) }}
+                {% endfor %}
+            </ul>
+        </li>
     {% endfor %}
 </ul>
 
-<ul class="tree">
-    {{ render_tree(tree) }}
-</ul>
-
-<script src="https://code.jquery.com/jquery-2.1.3.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
 <script>
 
 $('.node').on('mouseover', function() {
@@ -98,6 +106,10 @@ $('.node').on('mouseover', function() {
 
 $('.node').on('mouseout', function() {
     $(this).find('> .context').hide();
+});
+
+$('.select-strategy').on('change', function() {
+    window.location.href = $(this).val();
 });
 
 </script>

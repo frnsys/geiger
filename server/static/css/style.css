@@ -1,0 +1,166 @@
+html, body {
+    color: #222;
+    font-family: "nyt-franklin",arial,helvetica,sans-serif;
+    padding: 0;
+    margin: 0;
+}
+.primary-header {
+    background: #F6F6F6;
+    overflow: hidden;
+    border-bottom: 1px solid #E5E5E5;
+}
+h1 {
+    font-family: "nyt-stymie";
+    font-weight: 700;
+    font-size: 1.5em;
+}
+header h1 {
+    margin: 0.5em 1em;
+    float: left;
+}
+a, a:visited {
+    color: #31708F;
+}
+.quote {
+    font-weight: 700;
+    font-size: 1.8em;
+    color: #31708F;
+    padding: 0.1em;
+}
+.ellipsis {
+    color: #CCC;
+}
+.quote:first-child {
+    padding-left: 0;
+}
+.quote:last-child {
+    padding-right: 0;
+}
+.url {
+    width: 80%;
+    float: right;
+    background: none repeat scroll 0% 0% rgb(238, 238, 238);
+    height: 2em;
+    font-size: 1.2em;
+    border: none;
+    border-left: 1px solid #E5E5E5;
+    padding: 0.5em 1em;
+    font-family: "nyt-franklin",arial,helvetica,sans-serif;
+}
+.error {
+    color: #FC0D1B;
+}
+.loading {
+    color: #aaa;
+}
+
+.subject--title {
+    font-family: "nyt-cheltenham",georgia,"times new roman",times,serif;
+    font-style: italic;
+    font-size: 2em;
+}
+.subject, .comments {
+    max-width: 720px;
+    padding: 4em;
+    margin: 0 auto;
+}
+.subject {
+    margin: 0 auto;
+    line-height: 1.5;
+    font-family: "georgia", "times new roman","times","serif";
+}
+.subject .error, .loading {
+    font-family: "nyt-franklin",arial,helvetica,sans-serif;
+    text-align: center;
+}
+
+.featurizers {
+    padding: 0.5em 2em 1em 2em;
+    position: absolute;
+    left: 0;
+    border: 1px solid #f0f0f0;
+    margin: 0 0 0 1em;
+    background: #fafafa;
+}
+.featurizers ul {
+    padding: 0 0 0 1em;
+}
+
+.strategy {
+    margin: 0 0 6em 0;
+}
+.strategy header {
+    overflow: hidden;
+}
+.strategy h2 {
+    display: inline;
+    float: left;
+    margin: 0;
+}
+.controls {
+    float: right;
+}
+.hide {
+    display: none;
+}
+button {
+    padding: 0.1em 0.5em 0.2em 0.5em;
+    border-radius: 0.4em;
+    background: #fff;
+    border: 1px solid #dadada;
+    cursor: pointer;
+}
+
+.thread {
+    list-style-type: none;
+    padding: 0;
+}
+.comment {
+    padding: 1em 0;
+}
+.support {
+    color: #C0C0C0;
+    margin: 1em 0;
+}
+.support span {
+    color: #AAA;
+}
+.thread .thread {
+    padding-left: 2em;
+}
+.thread .thread .comment {
+    margin-top: 1px;
+}
+
+/* Loader by Tobias Ahlin */
+/* https://github.com/tobiasahlin/SpinKit/blob/master/examples/5-pulse.html */
+.loader {
+  width: 24px;
+  height: 24px;
+  margin: 0 auto;
+  background-color: #333;
+  border-radius: 100%;
+  -webkit-animation: sk-pulseScaleOut 1s infinite ease-in-out;
+          animation: sk-pulseScaleOut 1s infinite ease-in-out; }
+
+@-webkit-keyframes sk-pulseScaleOut {
+  0% {
+    -webkit-transform: scale(0);
+            transform: scale(0); }
+
+  100% {
+    -webkit-transform: scale(1);
+            transform: scale(1);
+    opacity: 0; } }
+
+@keyframes sk-pulseScaleOut {
+  0% {
+    -webkit-transform: scale(0);
+            transform: scale(0); }
+
+  100% {
+    -webkit-transform: scale(1);
+            transform: scale(1);
+    opacity: 0; } }
+
+
