@@ -35,6 +35,10 @@ def aspects_only_rake(comments):
     return sentences.extract_by_aspects(comments, strategy='rake')
 
 
+def aspects_only_apriori(comments):
+    return sentences.extract_by_apriori(comments)
+
+
 def baseline(comments):
     """
     Baseline: select 5 random sentences.

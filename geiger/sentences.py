@@ -4,6 +4,7 @@ from nltk import sent_tokenize
 from scipy.spatial.distance import cdist
 from geiger.featurizers import featurize
 from geiger.aspects import extract_aspects
+from geiger.apriori import apriori
 
 
 class Sentence():
@@ -109,8 +110,9 @@ def extract_by_aspects(comments, strategy='pos_tag'):
 
         [(sentence body, sentence comment, support), ...]
 
-
     Note: here the support value is not the # of comments, but the # of sentences.
+
+    TO DO don't pick sentences randomly, rank them in some way.
     """
     sents = []
     for comment in comments:
@@ -139,6 +141,49 @@ def extract_by_aspects(comments, strategy='pos_tag'):
     # Pick a random sentence for each aspect.
     results = []
     for aspect, sents in aspects.items():
+        sent = random.choice(sents)
+        results.append((sent.body, sent.comment, counts[aspect]))
+    return results
+
+
+from geiger.aspects import extract_aspect_candidates
+def extract_by_apriori(comments, min_sup=0.05):
+    """
+    This is similar to `extract_by_aspects` but uses the Apriori algorithm.
+
+    Returns a list of tuples:
+
+        [(sentence body, sentence comment, support), ...]
+
+    Note: here the support value is not the # of comments, but the # of sentences.
+
+    TO DO tweak `min_sup` param, for small amounts of comments (<=100), may be hard
+    to identify proper aspects.
+
+    TO DO don't pick sentences randomly, rank them in some way.
+
+    TO DO Aspect identification might be better if we lemmatize them.
+    But then need to keep track of which lemmas map to which sentences (can't check via `in`).
+    """
+    sents = []
+    for comment in comments:
+        sents += [Sentence(sent, comment) for sent in sent_tokenize(comment.body) if len(sent) >= 10]
+
+    aspects = apriori([extract_aspect_candidates(s.body.lower()) for s in sents], min_sup=min_sup)
+
+    # Cluster based on aspects.
+    # This could be cleaned up/made more efficient
+    aspect_sents = {k: [] for k in aspects}
+    counts = {k: 0 for k in aspects}
+    for sent in sents:
+        for aspect in aspects:
+            if aspect in sent.body.lower():
+                counts[aspect] += 1
+                aspect_sents[aspect].append(sent)
+
+    # Pick a random sentence for each aspect.
+    results = []
+    for aspect, sents in aspect_sents.items():
         sent = random.choice(sents)
         results.append((sent.body, sent.comment, counts[aspect]))
     return results

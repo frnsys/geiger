@@ -116,6 +116,14 @@ def strip_tags(html):
     return s.get_data()
 
 
+punct_map = {ord(p): ' ' for p in string.punctuation + '“”'}
+period_map = {ord('.'): None} # To preserve initialisms, e.g. F.D.A. -> FDA
+def strip_punct(doc, keep_periods=True):
+    if keep_periods:
+        return doc.translate(period_map).translate(punct_map)
+    return doc.translate(punct_map)
+
+
 def html_decode(s):
     """
     Returns the ASCII decoded version of the given HTML string. This does

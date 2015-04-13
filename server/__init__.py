@@ -17,6 +17,7 @@ def index():
         'lda_extract_by_topics',
         'aspects_only_pos',
         'aspects_only_rake',
+        'aspects_only_apriori',
         'baseline'
     ]
 

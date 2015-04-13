@@ -1,6 +1,7 @@
 from nltk import pos_tag, word_tokenize, sent_tokenize, RegexpParser
 from nltk.corpus import stopwords
 from geiger.keywords import Rake
+from geiger.text import strip_punct
 
 """
 The code for the NLTK noun phrase aspect extraction strategy is adapted from Jeffrey Fossett:
@@ -35,14 +36,22 @@ def extract_aspects(sentence, strategy='pos_tag'):
         return [kw[0] for kw in keywords if kw not in stops]
 
     else:
-        tokens = word_tokenize(sentence)
-        tagged = pos_tag(tokens)
-        tree = CHUNKER.parse(tagged)
-        aspects = [[w for w,t in leaf] for leaf in _leaves(tree)]
-        aspects = [i for s in aspects for i in s if i not in stops]
-        return aspects
+        return extract_aspect_candidates(sentence)
 
 
 def _leaves(tree):
     for subtree in tree.subtrees(filter=lambda t: t.label()=='NP'):
         yield subtree.leaves()
+
+
+def extract_aspect_candidates(sentence):
+    """
+    Extract noun phrases and nouns as aspects.
+    """
+    sentence = strip_punct(sentence)
+    tokens = word_tokenize(sentence)
+    tagged = pos_tag(tokens)
+    tree = CHUNKER.parse(tagged)
+    aspects = [[w for w,t in leaf] for leaf in _leaves(tree)]
+    aspects = [i for s in aspects for i in s if i not in stops]
+    return aspects

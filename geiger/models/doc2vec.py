@@ -4,6 +4,7 @@ import config
 from time import time
 from nltk import word_tokenize
 from nltk.corpus import stopwords
+from geiger.text import strip_punct
 from geiger.util.progress import Progress
 from gensim.models.doc2vec import Doc2Vec, LabeledSentence
 
@@ -84,8 +85,6 @@ class Model():
         self.m.train_words = False
 
 
-    punct_map = {ord(p): ' ' for p in string.punctuation + '“”'}
-    period_map = {ord('.'): None} # To preserve initialisms, e.g. F.D.A. -> FDA
     def _tokenize(self, doc):
         """
         For tokenization, we do not want to remove
@@ -95,8 +94,7 @@ class Model():
         Though we do remove/clean up some punctuation.
         """
 
-        doc = doc.translate(self.period_map)
-        doc = doc.translate(self.punct_map)
+        doc = strip_tags(doc)
         return word_tokenize(doc.lower())
 
 
@@ -147,6 +145,5 @@ class Model():
         """
         not sure if this helps
         """
-        doc = doc.translate(self.period_map)
-        doc = doc.translate(self.punct_map)
+        doc = strip_punct(doc)
         return [t for t in word_tokenize(doc) if t not in self.stops]

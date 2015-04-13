@@ -8,7 +8,7 @@
 
 <div class="subject">
     <div class="loading">
-        <div class="loader hide"></div>
+        <div class="loader"></div>
         <h4>Loading article...</h4>
     </div>
     <div class="error hide"></div>
@@ -68,7 +68,7 @@
         var comments;
 
         // By default, just load example data.
-        get_comments('');
+        get_comments($('input.url').val());
 
         // Submit an NYT article url to load.
         // This only works on the NYT internal network :(
