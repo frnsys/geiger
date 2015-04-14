@@ -45,7 +45,7 @@ To my knowledge, no one has yet tried a similar technique on comments.
 
 ## Evaluation
 
-I have developed a system which applies a variety of extraction strategies to the comments of any arbitrary NYT article and displays their outputs side-by-side. Using this system, we can develop some ground truth data with human annotators so we can automatically measure the performance of Geiger.
+I have developed a web app which applies a variety of extraction strategies to the comments of any arbitrary NYT article and displays their outputs side-by-side. Using this frontend, we can develop some ground truth data with human annotators so we can automatically measure the performance of Geiger.
 
 Alternatively, we can use A/B testing and develop a ranking of which strategies are preferred, comparing against human-selected highlights. We could develop a Chrome extension which mocks these highlights into the NYT site to simulate the experience.
 
@@ -54,10 +54,6 @@ Alternatively, we can use A/B testing and develop a ranking of which strategies 
 ### Performance
 
 In the current prototype, when the number of comments exceeds ~500, the time for incorporating a new comment grows dramatically. This speed should be better for production usage.
-
-### Evaluation
-
-As far as I know, there is no ground-truth data to evaluate the cluster quality against. What's the best way to test if the results look good?
 
 ### Determining cluster cutoffs
 
