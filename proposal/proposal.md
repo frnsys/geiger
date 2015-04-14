@@ -4,7 +4,7 @@ Here I propose an automated system for grouping similar comments and then identi
 
 ## Motivation
 
-On popular or controversial stories, there may be hundreds to thousands of comments. It is unrealistic to assume that anyone will read even a significant fraction of the comments for these cases. Even in more modest amounts (<100), there may still be too many comments to read all the way through. Making sense of how people are reacting and what the general opinions are towards something is a very noisy and labor-intensive process. Considering the varying quality and sheer quantity of comments, readers may be intimidated away and join more manageable discussions on other platforms. It is possible that a reader still wants a general understanding of the sentiment or reaction towards a particular piece, and this could provide an entry point into the conversation on the NYT site.
+On popular or controversial stories, there may be hundreds to thousands of comments. In these cases it is unrealistic to assume that anyone will read even a significant fraction of the comments. Even in more modest amounts (<100), there may still be too many comments to read all the way through. Making sense of how people are reacting and what the general opinions are towards something is a very noisy and labor-intensive process. Considering the varying quality and sheer quantity of comments, readers may be intimidated away and join more manageable discussions on other platforms. It is possible that a reader still wants a general understanding of the sentiment or reaction towards a particular piece, and this could provide an entry point into the conversation on the NYT site.
 
 ## Hypothesis
 
@@ -47,7 +47,7 @@ To my knowledge, no one has yet tried a similar technique on comments.
 
 I have developed a system which applies a variety of extraction strategies to the comments of any arbitrary NYT article and displays their outputs side-by-side. Using this system, we can develop some ground truth data with human annotators so we can automatically measure the performance of Geiger.
 
-Alternatively, we can use A/B testing and develop a ranking of which strategies are preferred, comparing against human-selected highlights.
+Alternatively, we can use A/B testing and develop a ranking of which strategies are preferred, comparing against human-selected highlights. We could develop a Chrome extension which mocks these highlights into the NYT site to simulate the experience.
 
 ## Challenges
 
