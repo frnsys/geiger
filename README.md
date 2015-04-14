@@ -1,6 +1,6 @@
 # Geiger
 
-(work in progress)
+(work in progress - for details, see the [proposal](proposal/proposal.md).)
 
 The IHAC clustering strategy relies on my implementation of IHAC in [galaxy](https://github.com/ftzeng/galaxy) which is still kind of finicky.
 
