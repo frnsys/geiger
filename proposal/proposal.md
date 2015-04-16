@@ -51,13 +51,8 @@ Alternatively, we can use A/B testing and develop a ranking of which strategies 
 
 ## Challenges
 
-### Performance
-
-In the current prototype, when the number of comments exceeds ~500, the time for incorporating a new comment grows dramatically. This speed should be better for production usage.
-
-### Determining cluster cutoffs
-
-Different kinds of articles may have different cluster structures - for instance, for an article in which there is a consensus opinion, we would expect the clusters to be much more nuanced. For a very polarizing article, we could expect the clusters to be very distinct. One challenge is in determining where to set off the cutoffs for clusters in each case.
+- The main challenge is ensuring that comments which are making the same point, as judged by a human, is approximated by the automated clustering approach.
+- The second challenge is effectively selecting a sentence which is representative of the main point of each cluster.
 
 ## Current Status
 

@@ -27,9 +27,9 @@ def prefilter(sentence):
 
     # The following rules are meant to filter out sentences
     # which may require extra context.
-    elif first_char in ['"', '(', '\'', '*', '“', '‘']:
+    elif first_char in ['"', '(', '\'', '*', '“', '‘', ':']:
         return False
-    elif first_word in ['however', 'so', 'for', 'or', 'and', 'thus', 'therefore']:
+    elif first_word in ['however', 'so', 'for', 'or', 'and', 'thus', 'therefore', 'also', 'firstly', 'secondly', 'thirdly']:
         return False
     elif set(tokens).intersection({'he', 'she', 'it', 'they', 'them', 'him', 'her', 'their', 'I'}):
         return False
@@ -72,7 +72,7 @@ def extract_by_distance(clusters, featurizer, top_n=5):
     sizes = np.array([len(clus) for clus in clusters])
     max_idx = np.argpartition(sizes, -top_n)[-top_n:]
 
-    return [(results[i].body, results[i].comment, sizes[i], clusters[i]) for i in max_idx]
+    return [(results[j].body, results[j].comment, sizes[j], clusters[j]) for j in max_idx]
 
 
 def extract_by_topics(clusters, lda, top_n=5):
