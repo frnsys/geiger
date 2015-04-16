@@ -1,5 +1,5 @@
 from geiger.text import Vectorizer
-from geiger.keywords import Rake
+from geiger.aspects.keywords import Rake
 
 class Featurizer():
     """
@@ -28,7 +28,7 @@ class Featurizer():
             pseudo_docs.append(pseudo_doc)
             key_docs.append(' '.join(pseudo_doc))
 
-        kvecs = self.vectr.vectorize(key_docs, train=not self.trained)
+        kvecs = self.vectr.vectorize(key_docs, train=not self.trained).todense()
         self.trained = True
         if return_ctx:
             return kvecs, pseudo_docs

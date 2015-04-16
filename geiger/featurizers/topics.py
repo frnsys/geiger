@@ -7,16 +7,14 @@ class Featurizer():
     where n is the number of topics.
     """
 
-    def __init__(self, n_topics=None):
+    def __init__(self, n_topics=5):
         self.trained = False
-        self.m = lda.Model(n_topics=n_topics)
+        self.m = lda.Model(n_topics=n_topics, verbose=True)
 
     def featurize(self, comments, return_ctx=False):
         if not self.trained:
             self.m.train(comments)
-            topic_dists = self.m.topic_dists
-        else:
-            topic_dists = self.m.featurize([c.body for c in comments])
+        topic_dists = self.m.featurize([c.body for c in comments])
 
         self.trained = True
         if return_ctx:

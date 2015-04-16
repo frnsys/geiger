@@ -70,6 +70,9 @@ ul > li {
     margin: 0.5em;
     font-size: 1.4em;
 }
+.clustering-featurizers {
+    padding: 1em;
+}
 </style>
 
 <header class="primary-header">
@@ -84,6 +87,10 @@ ul > li {
         {% endfor %}
     </select>
 </header>
+
+<div class="clustering-featurizers">
+    {{ featurizers }}
+</div>
 
 <ul class="tree">
     {% for cluster in clusters %}

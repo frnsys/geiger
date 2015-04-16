@@ -13,17 +13,22 @@ import os
 import numpy as np
 import pandas as pd
 from geiger.text import strip_tags
-from geiger.featurizers import opinion, subjectivity, doc2vec
+from geiger.featurizers import opinion, subjectivity, bow
 from sklearn.cross_validation import train_test_split
-from sklearn import linear_model
-from sklearn import metrics
+from sklearn import linear_model, svm, metrics, preprocessing
+from sklearn.ensemble import RandomForestClassifier
 
 data_path = 'data/sentiment/'
 
 
 class Model():
-    def __init__(self):
-        self._m = linear_model.LogisticRegression('l2', class_weight={1: 1})
+    def __init__(self, model='logistic_regression'):
+        if model == 'logistic_regression':
+            self._m = linear_model.LogisticRegression('l2')
+        elif model == 'svm':
+            self._m = svm.SVC()
+        else:
+            self._m = RandomForestClassifier(n_estimators=10, n_jobs=-1)
 
     def train(self, X_train, y_train):
         self._m.fit(X_train, y_train)
@@ -44,11 +49,12 @@ class Model():
         recall = metrics.recall_score(y_test, y_pred)
         roc_auc = metrics.roc_auc_score(y_test, y_pred)
         return {
+            'model': self._m.__class__.__name__,
             'accuracy': accuracy,
             'precision': precision,
             'recall': recall,
             'roc_auc': roc_auc,
-            'coef': list(self._m.coef_[0])
+            #'coef': list(self._m.coef_[0])
         }
 
 
@@ -135,13 +141,14 @@ def _load_congress(path):
 def main():
     opinion_f = opinion.Featurizer()
     subject_f = subjectivity.Featurizer()
-    d2v_f = doc2vec.Featurizer()
+    bow_f = bow.Featurizer()
 
     class Doc():
         def __init__(self, doc):
             self.body = doc
 
     data = [d for d in load_congress()]
+    data = [d for d in load_movies()]
     docs, labels = zip(*data)
 
     docs = [Doc(d) for d in docs]
@@ -151,18 +158,57 @@ def main():
     opinion_feats = opinion_f.featurize(docs)
     print('Building subjectivity features...')
     subject_feats = subject_f.featurize(docs)
-    print('Building doc2vec features...')
-    doc2vec_feats = d2v_f.featurize(docs)
-    X = np.hstack([opinion_feats, subject_feats, doc2vec_feats])
+    print('Building bow features...')
+    bow_feats = bow_f.featurize(docs)
+
+    print('all')
+    X = np.hstack([opinion_feats, subject_feats, bow_feats])
+    X = preprocessing.StandardScaler().fit_transform(X)
 
     X_train, X_test, y_train, y_test = train_test_split(X, labels, test_size=0.2)
 
-    m = Model()
-    m.train(X_train, y_train)
-    scores = m.evaluate(X_test, y_test)
-    print(scores)
+    #for model in ['logistic_regression', 'svm', 'random_forest']:
+    for model in ['logistic_regression', 'random_forest']:
+        m = Model(model=model)
+        m.train(X_train, y_train)
+        scores = m.evaluate(X_test, y_test)
+        print(scores)
 
+    print('opinion + bow')
+    X = np.hstack([opinion_feats, bow_feats])
+    X = preprocessing.StandardScaler().fit_transform(X)
 
+    X_train, X_test, y_train, y_test = train_test_split(X, labels, test_size=0.2)
+
+    for model in ['logistic_regression', 'random_forest']:
+        m = Model(model=model)
+        m.train(X_train, y_train)
+        scores = m.evaluate(X_test, y_test)
+        print(scores)
+
+    print('subjectivity + bow')
+    X = np.hstack([subject_feats, bow_feats])
+    X = preprocessing.StandardScaler().fit_transform(X)
+
+    X_train, X_test, y_train, y_test = train_test_split(X, labels, test_size=0.2)
+
+    for model in ['logistic_regression', 'random_forest']:
+        m = Model(model=model)
+        m.train(X_train, y_train)
+        scores = m.evaluate(X_test, y_test)
+        print(scores)
+
+    print('bow feats')
+    X = bow_feats
+    X = preprocessing.StandardScaler().fit_transform(X)
+
+    X_train, X_test, y_train, y_test = train_test_split(X, labels, test_size=0.2)
+
+    for model in ['logistic_regression', 'random_forest']:
+        m = Model(model=model)
+        m.train(X_train, y_train)
+        scores = m.evaluate(X_test, y_test)
+        print(scores)
 
 if __name__ == '__main__':
     main()

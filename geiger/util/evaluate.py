@@ -1,13 +1,12 @@
-import numpy as np
 from sklearn import metrics
-from sklearn.grid_search import ParameterGrid
-from galaxy.cluster.ihac import Hierarchy
-from geiger.featurizers import featurize
+from geiger import clustering
+from geiger.featurizers import Featurizer
+
 
 METRICS = ['adjusted_rand', 'adjusted_mutual_info', 'completeness', 'homogeneity']
 
 
-def score(labels_true, labels_pred):
+def score(strat, labels_true, labels_pred):
     """
     Score clustering results.
 
@@ -25,26 +24,22 @@ def score(labels_true, labels_pred):
     all that matters is that the items which belong together
     have been clustered together.
     """
-    return {metric: metrics.__dict__['{0}_score'.format(metric)](labels_true, labels_pred) for metric in METRICS}
+    scores = {metric: metrics.__dict__['{0}_score'.format(metric)](labels_true, labels_pred) for metric in METRICS}
+    scores['strategy'] = strat.__name__
+    return scores
 
 
 def evaluate(docs, labels_true):
-    features = featurize(docs)
-    h = Hierarchy(metric='cosine', lower_limit_scale=0.9, upper_limit_scale=1.2)
-    ids = h.fit(features)
-
-    # Build a map of hierarchy ids to docs.
-    map = {ids[i]: c for i, c in enumerate(docs)}
-
-    pg = ParameterGrid({
-        'distance_threshold': np.arange(0.1, 0.8, 0.05)
-    })
-
+    """
+    Run a few different clustering algos and see how they compare.
+    """
     scores = []
-    for params in pg:
-        params['with_labels'] = True
-        clusters, labels_pred = h.clusters(**params)
-        print(labels_pred)
-        scores.append((params, score(labels_true, labels_pred)))
+    featurizer = Featurizer()
+    for c in [
+        clustering.hac,
+        clustering.k_means,
+        clustering.dbscan]:
+        labels_pred = c(docs, featurizer, return_labels=True)
+        scores.append(score(c, labels_true, labels_pred))
 
     return scores

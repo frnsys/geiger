@@ -46,6 +46,10 @@ class Vectorizer():
         else:
             return self.pipeline.transform(docs)
 
+    @property
+    def vocabulary(self):
+        return self.pipeline.named_steps['vectorizer'].get_feature_names()
+
 
 class Tokenizer():
     """

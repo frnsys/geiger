@@ -1,54 +1,62 @@
 import config
 import importlib
+import numpy as np
 from scipy import sparse
 from sklearn import preprocessing
 
 
-# For development, cache featurizers are part of the module.
-# If we start running this as part of a server, then we can't do this;
-# we would need featurizers for each article instead.
-featurizers = []
-scalr = None
-for name, kwargs in config.featurizers.items():
-    path = '{0}.{1}'.format(__name__, name)
-    mod = importlib.import_module(path)
-    featurizers.append(mod.Featurizer(**kwargs))
-
-def featurize(comments, return_ctx=False):
+class Featurizer():
     """
-    Featurizes a list of comments according to the config.
-    """
-    global scalr
-    feats = []
-    for featurizer in featurizers:
-        feats.append(featurizer.featurize(comments, return_ctx=return_ctx))
+    This is a super-featurizer,
+    in that it is the amalgamation of many featurizers
+    and provides a single interface.
 
-    # Extract the context for each comment.
-    # This is a dictionary mapping of feature names
-    # to some human-readable representation of the features
-    # for each comment.
-    if return_ctx:
-        ctx = []
+    This way, featurizers can be cached and reused later on.
+
+    The featurizers that are used are specified in `config.py`.
+
+    Note that featurizers MUST return dense matrices, not a sparse ones.
+    """
+    def __init__(self):
+        self.scalr = None
+        self.featurizers = []
+        for name, kwargs in config.featurizers.items():
+            path = '{0}.{1}'.format(__name__, name)
+            mod = importlib.import_module(path)
+            self.featurizers.append(mod.Featurizer(**kwargs))
+
+    def featurize(self, comments, return_ctx=False):
+        feats = []
+        for featurizer in self.featurizers:
+            feats.append(featurizer.featurize(comments, return_ctx=return_ctx))
+
+        # Extract the context for each comment.
+        # This is a dictionary mapping of feature names
+        # to some human-readable representation of the features
+        # for each comment.
+        if return_ctx:
+            ctx = []
+            for i, c in enumerate(comments):
+                d = {}
+                for j, name in enumerate(config.featurizers.keys()):
+                    d[name] = feats[j][1][i]
+                ctx.append(d)
+            feats = [f[0] for f in feats]
+
+        feats = np.hstack(feats)
+        feats = np.nan_to_num(feats)
+
+        if self.scalr is None:
+            self.scalr = preprocessing.StandardScaler()
+            feats = self.scalr.fit_transform(feats)
+        else:
+            feats = self.scalr.transform(feats)
+
+        # Attach features to comments for re-use later.
         for i, c in enumerate(comments):
-            d = {}
-            for j, name in enumerate(config.featurizers.keys()):
-                d[name] = feats[j][1][i]
-            ctx.append(d)
-        feats = [f[0] for f in feats]
+            c.features = feats[i]
 
-    feats = sparse.hstack(feats)
-
-    if scalr is None:
-        scalr = preprocessing.StandardScaler()
-        feats = scalr.fit_transform(feats.todense())
-    else:
-        feats = scalr.transform(feats.todense())
-
-    # Attach features to comments for re-use later.
-    for i, c in enumerate(comments):
-        c.features = feats[i]
-
-    if return_ctx:
-        return feats, ctx
-    else:
-        return feats
+        if return_ctx:
+            return feats, ctx
+        else:
+            return feats

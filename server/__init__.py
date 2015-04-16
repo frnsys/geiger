@@ -4,6 +4,7 @@ import geiger
 from geiger.text import strip_tags
 from geiger.comment import Comment
 from geiger import services, clustering
+from geiger.featurizers import Featurizer
 from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__, static_folder='static', static_url_path='')
@@ -13,6 +14,8 @@ app = Flask(__name__, static_folder='static', static_url_path='')
 def index():
     strats = [
         'kmeans_extract_by_distance',
+        'hac_extract_by_distance',
+        'dbscan_extract_by_distance',
         'lda_extract_by_distance',
         'lda_extract_by_topics',
         'aspects_only_pos',
@@ -56,15 +59,20 @@ def visualize(strategy, url):
         'lda': clustering.lda,
         'hac': clustering.hac,
         'ihac': clustering.ihac,
-        'k_means': clustering.k_means
+        'k_means': clustering.k_means,
+        'dbscan': clustering.dbscan
     }
 
     if strategy not in strats:
         return 'No clustering strategy by the name "{0}". Use one of {1}.'.format(strategy, list(strats.keys())), 404
     else:
-        clusters = strats[strategy](comments, return_ctx=True)
+        if strategy == 'lda':
+            clusters = strats[strategy](comments, return_ctx=True)
+        else:
+            f = Featurizer()
+            clusters = strats[strategy](comments, f, return_ctx=True)
 
-    return render_template('visualize.html', clusters=clusters, strategies=list(strats.keys()), strategy=strategy, url=url)
+    return render_template('visualize.html', clusters=clusters, strategies=list(strats.keys()), strategy=strategy, featurizers=config.featurizers, url=url)
 
 
 # Some simple API routes for an async frontend.

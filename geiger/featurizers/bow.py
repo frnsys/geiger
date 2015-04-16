@@ -7,11 +7,10 @@ class Featurizer():
     """
     def __init__(self):
         self.trained = False
+        self.vectr = Vectorizer()
 
     def featurize(self, comments, return_ctx=False):
-        v = Vectorizer()
-        vecs = v.vectorize([c.body for c in comments], train=not self.trained)
-
+        vecs = self.vectr.vectorize([c.body for c in comments], train=not self.trained).todense()
         self.trained = True
 
         if return_ctx:

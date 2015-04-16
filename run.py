@@ -1,11 +1,15 @@
 import sys
+import json
 import pandas as pd
 from sklearn.externals import joblib
 
 import config
 from server import app
 
+from geiger.comment import Doc
+from geiger.util.evaluate import evaluate
 from geiger.models.doc2vec import Model as Doc2Vec
+from geiger.models.polisent import Model as Polisent
 
 
 def train_doc2vec():
@@ -18,6 +22,13 @@ def train_doc2vec():
         'data/all_approved_comments_02.csv',
         'data/all_approved_comments_03.csv'
     ])
+
+
+def train_polisent():
+    print('Training the polisent model...')
+    m = Polisent()
+    m.train()
+    print('Done.')
 
 
 def server():
@@ -48,13 +59,8 @@ def eval():
 
     This is probably super unreliable since there's so little data, but it's a starting point :)
     """
-    import json
     path_to_examples = 'data/examples.json'
     clusters = json.load(open(path_to_examples, 'r'))
-
-    class Doc():
-        def __init__(self, doc):
-            self.body = doc
 
     docs = []
     labels = []
@@ -63,8 +69,8 @@ def eval():
             docs.append(Doc(doc))
             labels.append(i)
 
-    from geiger.util.evaluate import evaluate
-    print(evaluate(docs, labels))
+    results = evaluate(docs, labels)
+    print(json.dumps(results, indent=4, sort_keys=True))
 
 
 if __name__ == '__main__':

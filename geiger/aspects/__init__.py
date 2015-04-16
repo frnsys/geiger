@@ -1,6 +1,6 @@
 from nltk import pos_tag, word_tokenize, sent_tokenize, RegexpParser
 from nltk.corpus import stopwords
-from geiger.keywords import Rake
+from geiger.aspects.keywords import Rake
 from geiger.text import strip_punct
 
 """

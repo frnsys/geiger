@@ -24,6 +24,7 @@ featurizers = {
     'subjectivity': {},
     'opinion': {},
     'doc2vec': {},
+    'polisent': {},
     'topics': {
         'n_topics': 10
     }

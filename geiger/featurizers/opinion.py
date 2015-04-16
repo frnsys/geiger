@@ -58,12 +58,12 @@ class Featurizer():
 
     def featurize(self, comments, return_ctx=False):
         p = Progress('OPIN')
-        n = len(comments) - 1
+        n = len(comments)
 
         pos_feats = []
         lex_feats = []
         for i, c in enumerate(comments):
-            p.print_progress(i/n)
+            p.print_progress((i+1)/n)
             comment = c.body
             pos_feats.append(self.pos_featurize(comment))
             lex_feats.append(self.lex_featurize(comment))

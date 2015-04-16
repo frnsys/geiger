@@ -61,7 +61,6 @@ class Model():
         On ~1.6 million comments, training took ~19min.
         """
 
-
         # For now, use mostly default settings.
         print('Training model...')
         t0 = time()

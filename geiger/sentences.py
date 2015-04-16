@@ -1,10 +1,9 @@
 import random
 import numpy as np
-from nltk import sent_tokenize
+from nltk import sent_tokenize, word_tokenize
 from scipy.spatial.distance import cdist
-from geiger.featurizers import featurize
 from geiger.aspects import extract_aspects
-from geiger.apriori import apriori
+from geiger.aspects.apriori import apriori
 
 
 class Sentence():
@@ -13,7 +12,34 @@ class Sentence():
         self.comment = comment
 
 
-def extract_by_distance(clusters, top_n=5):
+def prefilter(sentence):
+    """
+    Ignore sentences for which this returns False.
+    """
+    tokens = word_tokenize(sentence.lower())
+    first_word = tokens[0]
+    first_char = first_word[0]
+    final_char = tokens[-1][-1]
+
+    # Filter out short sentences.
+    if len(tokens) < 10:
+        return False
+
+    # The following rules are meant to filter out sentences
+    # which may require extra context.
+    elif first_char in ['"', '(', '\'', '*', '“', '‘']:
+        return False
+    elif first_word in ['however', 'so', 'for', 'or', 'and', 'thus', 'therefore']:
+        return False
+    elif set(tokens).intersection({'he', 'she', 'it', 'they', 'them', 'him', 'her', 'their', 'I'}):
+        return False
+    elif final_char in ['"', '”', '’']:
+        return False
+
+    return True
+
+
+def extract_by_distance(clusters, featurizer, top_n=5):
     """
     For each cluster, calculate a centroid vector (mean of its children's feature vectors),
     then select the sentence closest to the centroid.
@@ -33,8 +59,8 @@ def extract_by_distance(clusters, top_n=5):
         feats = []
         sents = []
         for comment in clus:
-            sents += [Sentence(sent, comment) for sent in sent_tokenize(comment.body) if len(sent) >= 10]
-        feats = featurize(sents)
+            sents += [Sentence(sent, comment) for sent in sent_tokenize(comment.body) if prefilter(sent)]
+        feats = featurizer.featurize(sents)
 
         # Calculate distances to the centroid.
         dists = cdist(centroid, feats, metric='cosine')
@@ -81,7 +107,7 @@ def extract_by_topics(clusters, lda, top_n=5):
             sents = sent_tokenize(comment.body)
 
             # Filter by length
-            sents = [sent for sent in sents if len(sent) > 100]
+            sents = [sent for sent in sents if prefilter(sent)]
 
             # Select only sentences which are congruous with the parent topic.
             clus_sents += [(Sentence(sent, comment), prob) for sent, sent_topic, prob in lda.identify(sents) if sent_topic == topic]
@@ -117,7 +143,7 @@ def extract_by_aspects(comments, strategy='pos_tag'):
     """
     sents = []
     for comment in comments:
-        sents += [Sentence(sent, comment) for sent in sent_tokenize(comment.body) if len(sent) >= 10]
+        sents += [Sentence(sent, comment) for sent in sent_tokenize(comment.body) if prefilter(sent)]
 
     # Calculate support for each aspect.
     counts = {}
@@ -169,7 +195,7 @@ def extract_by_apriori(comments, min_sup=0.05):
     """
     sents = []
     for comment in comments:
-        sents += [Sentence(sent, comment) for sent in sent_tokenize(comment.body) if len(sent) >= 10]
+        sents += [Sentence(sent, comment) for sent in sent_tokenize(comment.body) if prefilter(sent)]
 
     aspects = apriori([extract_aspect_candidates(s.body.lower()) for s in sents], min_sup=min_sup)
 
