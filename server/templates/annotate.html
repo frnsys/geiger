@@ -116,7 +116,7 @@ ul > li {
 <div class="tooltip hide">
     <h6>Current Selection</h6>
     <span class="current-selection"></span>
-    <span class="tip">(press "x" to save, "c" to clear)</span>
+    <span class="tip">(press "s" to save, "c" to clear)</span>
 </div>
 
 <script type="text/html" id="node_tmpl">
@@ -164,7 +164,7 @@ $(function() {
     $('body').on('mousedown', '.node .body', function() {
         var id = $(this).parent().data('id'),
             comment = comments[id],
-            clus_sels = selections[comment.cluster].length;
+            clus_sels = selections[comment.cluster];
 
         // Move to new cluster.
         comment.cluster += 1;
@@ -174,9 +174,9 @@ $(function() {
 
         // Grab selections from this comment to move to the new cluster.
         // there's def a better way to do this, but i'm too tired atm
-        for (var i = clus_sels.length; i >= 0; i--) {
+        for (var i = clus_sels.length - 1; i >= 0; i--) {
             if (clus_sels[i].comment_id == id) {
-                clus_sels[comment.cluster].push(clus_sels[i]);
+                selections[comment.cluster].push(clus_sels[i]);
                 clus_sels.splice(i, 1);
             }
         }
@@ -220,13 +220,13 @@ $(function() {
     }
 
     // Re-render clusters when 'r' is pressed.
-    // Save a selection when 'x' is pressed.
+    // Save a selection when 's' is pressed.
     // Clear a selection when 'c' is pressed.
     $('body').on('keydown', function(ev) {
         if (ev.keyCode == 82) {
             render_clusters();
 
-        } else if (ev.keyCode == 88) {
+        } else if (ev.keyCode == 83) {
             if (selection !== null && selections.indexOf(selection) === -1) {
                 var clus = comments[selection.comment_id].cluster;
                 selections[clus].push(selection);

@@ -23,6 +23,7 @@
                 <li>{{ featurizer }}</li>
             {% endfor %}
         </ul>
+        <p>Resolution: <b>{{ resolution }}</b></p>
     </div>
 
     {% for strat in strategies %}
@@ -65,9 +66,16 @@
         $('input.url').on('keypress', function(ev) {
             // Enter
             if (ev.keyCode == 13) {
+                var url = $(this).val();
+
+                // Remove URL params, they can mess up the fetching of comments.
+                url = url.split('?')[0]
+                $(this).val(url);
+
                 disable_geiger();
                 $('.subject--title, .subject--body').empty();
-                get_comments($(this).val());
+
+                get_comments(url);
             }
         });
 

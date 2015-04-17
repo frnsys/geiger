@@ -24,7 +24,8 @@ def index():
         'baseline'
     ]
 
-    return render_template('index.html', strategies=strats, featurizers=config.featurizers)
+    resolution = 'sentences' if config.sentences else 'comments'
+    return render_template('index.html', strategies=strats, featurizers=config.featurizers, resolution=resolution)
 
 
 @app.route('/visualize/<strategy>/', defaults={'url':''})
