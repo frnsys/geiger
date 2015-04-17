@@ -1,6 +1,6 @@
 import random
 from nltk.tokenize import sent_tokenize
-from geiger import clustering, sentences, aspects
+from geiger import clustering, sentences
 from geiger.featurizers import Featurizer
 
 """
@@ -10,12 +10,12 @@ These all return results in the format:
 
 """
 
-def lda_extract_by_topics(comments, n_topics=None):
+def lda_extract_by_topics(comments, n_topics=5):
     clusters, lda = clustering.lda(comments, n_topics=n_topics)
     return sentences.extract_by_topics(clusters, lda)
 
 
-def lda_extract_by_distance(comments, n_topics=None):
+def lda_extract_by_distance(comments, n_topics=5):
     # Build features for comments for later use.
     f = Featurizer()
     f.featurize(comments)

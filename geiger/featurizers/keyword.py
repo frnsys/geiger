@@ -1,5 +1,5 @@
 from geiger.text import Vectorizer
-from geiger.aspects.keywords import Rake
+from nytnlp.keywords import rake
 
 class Featurizer():
     """
@@ -9,18 +9,12 @@ class Featurizer():
     def __init__(self):
         self.trained = False
         self.vectr = Vectorizer(min_df=0., max_df=1.)
-        self.r = Rake('data/SmartStoplist.txt')
 
     def featurize(self, comments, return_ctx=False):
-        """
-        For now, using RAKE.
-        <https://github.com/aneesha/RAKE>
-        """
-
         key_docs = []
         pseudo_docs = []
         for c in comments:
-            keys = self.r.run(c.body)
+            keys = rake.extract_keywords([c.body])[0]
             # We are using cosine distance for our metric, which cannot handle empty vectors.
             # If we are using JUST these keyword docs, it's possible we have zero vectors,
             # in which case just make a pseudo-pseudo doc :)

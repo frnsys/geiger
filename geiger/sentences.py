@@ -2,8 +2,7 @@ import random
 import numpy as np
 from nltk import sent_tokenize, word_tokenize
 from scipy.spatial.distance import cdist
-from geiger.aspects import extract_aspects
-from geiger.aspects.apriori import apriori
+from nytnlp.keywords import apriori, pos, rake
 
 
 class Sentence():
@@ -31,6 +30,7 @@ def prefilter(sentence):
         return False
     elif first_word in ['however', 'so', 'for', 'or', 'and', 'thus', 'therefore', 'also', 'firstly', 'secondly', 'thirdly']:
         return False
+    # TO DO perhaps this should only check if these are in the first n words
     elif set(tokens).intersection({'he', 'she', 'it', 'they', 'them', 'him', 'her', 'their', 'I'}):
         return False
     elif final_char in ['"', '”', '’']:
@@ -109,6 +109,9 @@ def extract_by_topics(clusters, lda, top_n=5):
             # Filter by length
             sents = [sent for sent in sents if prefilter(sent)]
 
+            if not sents:
+                continue
+
             # Select only sentences which are congruous with the parent topic.
             clus_sents += [(Sentence(sent, comment), prob) for sent, sent_topic, prob in lda.identify(sents) if sent_topic == topic]
 
@@ -147,8 +150,9 @@ def extract_by_aspects(comments, strategy='pos_tag'):
 
     # Calculate support for each aspect.
     counts = {}
+    extractor = pos.extract_keywords if strategy == 'pos_tag' else rake.extract_keywords
     for sent in sents:
-        sent.aspects = extract_aspects(sent.body)
+        sent.aspects = extractor([sent.body])[0]
         for aspect in sent.aspects:
             if aspect not in counts:
                 counts[aspect] = 0
@@ -173,7 +177,6 @@ def extract_by_aspects(comments, strategy='pos_tag'):
     return results
 
 
-from geiger.aspects import extract_aspect_candidates
 def extract_by_apriori(comments, min_sup=0.05):
     """
     This is similar to `extract_by_aspects` but uses the Apriori algorithm.
@@ -197,7 +200,9 @@ def extract_by_apriori(comments, min_sup=0.05):
     for comment in comments:
         sents += [Sentence(sent, comment) for sent in sent_tokenize(comment.body) if prefilter(sent)]
 
-    aspects = apriori([extract_aspect_candidates(s.body.lower()) for s in sents], min_sup=min_sup)
+    aspects = apriori.extract_keywords([s.body.lower() for s in sents], min_sup=min_sup)
+    # Flatten
+    aspects = {a for l in aspects for a in l}
 
     # Cluster based on aspects.
     # This could be cleaned up/made more efficient

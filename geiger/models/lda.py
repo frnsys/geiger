@@ -1,6 +1,5 @@
 import numpy as np
 from geiger.text import Vectorizer
-from geiger.util.progress import Progress
 from gensim.matutils import Scipy2Corpus
 from gensim.models.ldamulticore import LdaMulticore
 
@@ -58,12 +57,24 @@ class Model():
             self.train(comments)
 
         clusters = [[] for _ in range(self.n_topics)]
-        dists = self.featurize(comments)
+        dists = self.featurize([c.body for c in comments])
         for i, comment in enumerate(comments):
             topic = dists[i].argmax()
             clusters[topic].append(comment)
 
         return clusters
+
+    def identify(self, docs):
+        """
+        Labels a list of documents with
+        their topic and probability for that topic.
+        """
+        vecs = self.vectr.vectorize(docs)
+        dists = self.featurize(docs)
+        for i, doc in enumerate(docs):
+            topic = dists[i].argmax()
+            proba = dists[i][topic]
+            yield doc, topic, proba
 
     def print_topics(self):
         vocab = self.vectr.vocabulary
