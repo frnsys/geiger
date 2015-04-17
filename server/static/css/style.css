@@ -53,6 +53,9 @@ li {
 .error {
     color: #FC0D1B;
 }
+.success {
+    color: #4FC3A0;
+}
 .loading {
     color: #aaa;
 }

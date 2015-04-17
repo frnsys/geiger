@@ -4,11 +4,10 @@ import config
 from time import time
 from nltk import word_tokenize
 from nltk.corpus import stopwords
-from geiger.text import strip_punct
 from geiger.util.progress import Progress
 from gensim.models.doc2vec import Doc2Vec, LabeledSentence
 
-
+shared_model = None
 class Model():
     """
     This is an augmentation of Word2Vec which is capable of creating vector
@@ -24,13 +23,20 @@ class Model():
     """
 
     def __init__(self):
+        global shared_model
         self.path = config.d2v_path
-        if os.path.exists(self.path):
+        if shared_model is not None:
+            self.m = shared_model
+
+        elif os.path.exists(self.path):
+            print('Loading doc2vec model...')
             self.m = Doc2Vec.load(self.path)
 
             # We leave word representations fixed, henceforth only learn representations of documents.
             # Or is it worthwhile to continue updating word representations?
             self.m.train_words = False
+
+            shared_model = self.m
 
     def train(self, data_paths):
         """
@@ -89,11 +95,7 @@ class Model():
         For tokenization, we do not want to remove
         stopwords or stem/lemmatize words. The `Doc2Vec` model learns
         from the context of words, so we need to preserve it.
-
-        Though we do remove/clean up some punctuation.
         """
-
-        doc = strip_tags(doc)
         return word_tokenize(doc.lower())
 
 

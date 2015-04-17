@@ -75,6 +75,30 @@ def visualize(strategy, url):
     return render_template('visualize.html', clusters=clusters, strategies=list(strats.keys()), strategy=strategy, featurizers=config.featurizers, url=url)
 
 
+@app.route('/annotate')
+def annotate():
+    """
+    For hand-annotating comments for a given article.
+    """
+    return render_template('annotate.html')
+
+
+@app.route('/api/annotate', methods=['POST'])
+def save_annotations():
+    """
+    Save the annotations from the frontend.
+    """
+    data = request.get_json()
+    title = data['subject']['title']
+
+    with open('data/annotations/{0}.json'.format(title), 'w') as f:
+        json.dump(data, f)
+
+    return jsonify({
+        'success': True
+    })
+
+
 # Some simple API routes for an async frontend.
 @app.route('/api/comments', methods=['GET'])
 def get_comments():

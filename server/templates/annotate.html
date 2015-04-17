@@ -1,0 +1,406 @@
+{% extends 'layout.html' %}
+
+{% macro render_comment(c, ctx) -%}
+    <li class="node comment">
+        <p class="body">{{ c.body_html|safe|truncate(70) }}</p>
+        <ul class="context">
+            <li>{{ c.body_html|safe }}</li>
+        </ul>
+    </li>
+{%- endmacro %}
+
+{% block content %}
+
+<style>
+.nodes {
+    text-align: center;
+}
+.node {
+    position: relative;
+}
+.node .body {
+    max-width: 120px;
+    background: #DDFBF2;
+    padding: 2em;
+    white-space: normal;
+    border-radius: 0.4em;
+    margin: 0.5em;
+    cursor: pointer;
+    text-align: left;
+}
+.comment {
+    padding: 0;
+}
+.context {
+    display: none;
+    position: absolute;
+    background: #f0f0f0;
+    font-size: 0.8em;
+    z-index: 10;
+    top: 5em;
+    left: 2em;
+    padding: 2em 4em;
+    width: 320px;
+    white-space: normal;
+    text-align: left;
+}
+.cluster {
+    padding: 2em;
+    border: 4px solid #31708F;
+    margin: 1em;
+    border-radius: 0.4em;
+}
+ul {
+    margin: 0;
+    padding: 0;
+}
+ul > li {
+    vertical-align: top;
+    display: inline-block;
+}
+.selections li {
+    margin: 1em 0;
+}
+.save-annotations {
+    margin: 2em auto;
+    display: block;
+}
+.delete-selection {
+    cursor: pointer;
+    color: #fff;
+    padding: 0.2em 0.5em;
+    border-radius: 1em;
+    background: #F65C5C;
+}
+.tooltip {
+    position: fixed;
+    background: #fafafa;
+    padding: 1em;
+    bottom: 0;
+    right: 0;
+    left: 0;
+}
+.tooltip .tip {
+    color: #d2d2d2;
+}
+.tooltip h6 {
+    margin: 0 0 0.5em 0;
+}
+.sentence:hover {
+    background: #64D68A;
+}
+</style>
+
+<header class="primary-header">
+    <h1>Geiger</h1>
+    <input type="text" class="url" placeholder="(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧ Enter a url to a NYT article w/ comments" />
+</header>
+
+<div class="subject">
+    <div class="subject--controls hide">
+        <button class="save-annotations">Save Annotations</button>
+    </div>
+    <div class="loading hide">
+        <div class="loader"></div>
+        <h4>Loading article...</h4>
+    </div>
+    <div class="error hide"></div>
+    <div class="success hide"></div>
+    <h1 class="subject--title"></h1>
+    <div class="subject--body"></div>
+</div>
+
+<div class="clusters">
+</div>
+
+<div class="tooltip hide">
+    <h6>Current Selection</h6>
+    <span class="current-selection"></span>
+    <span class="tip">(press "x" to save, "c" to clear)</span>
+</div>
+
+<script type="text/html" id="node_tmpl">
+    <li class="node" data-id="{3}">
+        <div class="body" style="background-color:#{0};">{1}</div>
+        <div class="context hide">{2}</div>
+    </li>
+</script>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+<script src="/js/main.js"></script>
+<script>
+$(function() {
+    var comments,
+        subject,
+        selection,
+        selections = [],
+        color_map = [
+            'FED963',
+            'A8FFFB',
+            'a7ffa5',
+            'cecaff',
+            'ffcaf6',
+            'ffcaca'
+        ],
+        n_clus = color_map.length;
+
+    // Create arrays for each cluster's selections.
+    for (var i = 0; i < n_clus; i++) {
+        selections.push([]);
+    }
+
+    // By default, load example data.
+    get_comments($('input.url').val());
+
+    // Show full comment on hover.
+    $('body').on('mouseover', '.node', function() {
+        $(this).find('> .context').show();
+    });
+    $('body').on('mouseout', '.node', function() {
+        $(this).find('> .context').hide();
+    });
+
+    // Change comment cluster membership on click.
+    $('body').on('mousedown', '.node .body', function() {
+        var id = $(this).parent().data('id'),
+            comment = comments[id],
+            clus_sels = selections[comment.cluster].length;
+
+        // Move to new cluster.
+        comment.cluster += 1;
+        if (comment.cluster >= n_clus) {
+            comment.cluster = 0;
+        }
+
+        // Grab selections from this comment to move to the new cluster.
+        // there's def a better way to do this, but i'm too tired atm
+        for (var i = clus_sels.length; i >= 0; i--) {
+            if (clus_sels[i].comment_id == id) {
+                clus_sels[comment.cluster].push(clus_sels[i]);
+                clus_sels.splice(i, 1);
+            }
+        }
+
+        $(this).css('background-color', '#'+color_map[comment.cluster]);
+    });
+
+    // Select a selection by selecting text.
+    $('body').on('mouseup', '.node .context', function() {
+        // yyeeEEAAAHhHH
+        var id = $(this).closest('.node').data('id'),
+            comment = comments[id],
+            text = $.trim(window.getSelection().toString());
+
+        if (text !== '') {
+            make_selection(text, comment);
+        }
+    });
+
+    // Select a selection by clicking a sentence.
+    $('body').on('click', '.sentence', function() {
+        var id = $(this).closest('.node').data('id'),
+            comment = comments[id],
+            text = $(this).text();
+
+        // Only do this if no text is selected.
+        if ($.trim(window.getSelection().toString()) === '') {
+            make_selection(text, comment);
+        }
+    });
+
+    function make_selection(text, comment) {
+        // Store the selection.
+        selection = {
+            comment_id: comment.id,
+            text: text
+        }
+
+        $('.tooltip').show();
+        $('.tooltip .current-selection').text(selection.text);
+    }
+
+    // Re-render clusters when 'r' is pressed.
+    // Save a selection when 'x' is pressed.
+    // Clear a selection when 'c' is pressed.
+    $('body').on('keydown', function(ev) {
+        if (ev.keyCode == 82) {
+            render_clusters();
+
+        } else if (ev.keyCode == 88) {
+            if (selection !== null && selections.indexOf(selection) === -1) {
+                var clus = comments[selection.comment_id].cluster;
+                selections[clus].push(selection);
+                selection = null;
+                $('.tooltip').hide();
+            }
+
+        } else if (ev.keyCode == 67) {
+            selection = null;
+            $('.tooltip').hide();
+        }
+    });
+
+    // Submit an NYT article url to load.
+    // This only works on the NYT internal network :(
+    $('input.url').on('keypress', function(ev) {
+        // Enter
+        if (ev.keyCode == 13) {
+            $('.subject--title, .subject--body').empty();
+            get_comments($(this).val());
+        }
+    });
+
+    // Delete a selection
+    $('body').on('click', '.delete-selection', function() {
+        var cluster = $(this).closest('.cluster').data('cluster'),
+            sels = selections[parseInt(cluster)],
+            text = $(this).siblings('.selection').text(); // barf
+
+        for (var i = 0; i < sels.length; i++) {
+            // barf
+            if (sels[i].text == text) {
+                sels.splice(i, 1);
+                $(this).parent().remove();
+                break;
+            }
+        }
+    });
+
+    // Load data for an NYT url.
+    function get_comments(url) {
+        $('.subject .error, .subject--controls').hide();
+        $('.subject .loading').show();
+        $('.clusters').empty();
+        $.ajax('/api/comments', {
+            method: 'GET',
+            accepts: 'application/json',
+            data: {
+                url: url
+            },
+            error: function(xhr, status, err) {
+                $('.subject .error').text(err).show();
+            },
+            success: function(data, status, xhr) {
+                comments = {};
+                for (var i = 0; i < data.comments.length; i++) {
+                    var comment = data.comments[i];
+                    comment.cluster = 0;
+                    comments[comment.id] = comment;
+                }
+                render_clusters();
+
+                subject = {
+                    title: data.title,
+                    body: data.body
+                };
+                $('.subject--title').text(subject.title);
+                $('.subject--body').html(subject.body);
+                $('.subject--controls').show();
+            },
+            complete: function() {
+                $('.subject .loading').hide();
+            }
+        });
+    }
+
+    function render_clusters() {
+        var clusters = [],
+            $el = $('.clusters');
+
+        $el.empty();
+
+        for (var i = 0; i < n_clus; i++) {
+            clusters.push([]);
+        }
+
+        // Build clusters in a way easier to iterate over.
+        for (var id in comments) {
+            if (comments.hasOwnProperty(id)) {
+                var comment = comments[id];
+                clusters[comment.cluster].push(comment);
+            }
+        }
+
+        // Render each cluster.
+        for (var i = 0; i < n_clus; i++) {
+            var html = '<div class="cluster" data-cluster="'+i+'"><ul class="selections">{0}</ul><ul class="nodes">{1}</ul></div>',
+                childs = '',
+                sels = '';
+
+            if (clusters[i].length > 0) {
+                // Render child comments.
+                for (var j = 0; j < clusters[i].length; j++) {
+                    var comment = clusters[i][j],
+                        sentences = split_sentences(comment.body),
+                        body_html = '';
+
+                    for (var k = 0; k < sentences.length; k++) {
+                        body_html += '<span class="sentence">{0}</span> '.format(sentences[k]);
+                    }
+
+                    childs += $('#node_tmpl').html().format(
+                            color_map[i],
+                            comment.body.substring(0, 60),
+                            body_html,
+                            comment.id);
+                }
+
+                // Render selections.
+                for (var j = 0; j < selections[i].length; j++) {
+                    sels += '<li><span class="delete-selection">X</span> <span class="selection">'+selections[i][j].text+'</span></li>';
+                }
+                $el.append(html.format(sels, childs));
+            }
+        }
+    }
+
+    function save() {
+        var el = $('.subject');
+        $.ajax('/api/annotate', {
+            method: 'POST',
+            accepts: 'application/json',
+            contentType: 'application/json',
+            dataType: 'json',
+            data: JSON.stringify({
+                comments: comments,
+                subject: subject,
+                selections: selections
+            }),
+            error: function(xhr, status, err) {
+                el.find('.error').text(err).show();
+            },
+            success: function(data, status, xhr) {
+                el.find('.success').text('~annotations saved~').fadeIn();
+                setTimeout(function() {
+                    el.find('.success').fadeOut();
+                }, 2000);
+            },
+            complete: function() {
+                el.find('.loader').hide();
+            }
+        });
+    }
+    $('.save-annotations').on('click', save);
+
+    // Courtesy of <http://stackoverflow.com/a/27633223/1097920>
+    // Doesn't have to be perfect, just for convenience. You can manually select
+    // sentences for cases where this doesn't work.
+    function split_sentences(text) {
+        var pattern = /(.+?([A-Z].)[\.|\?|!](?:['")\\\s]?)+?\s?)/igm,
+            match,
+            results = [];
+        while( ( match = pattern.exec( text )) != null ) {
+            if( match.index === pattern.lastIndex ) {
+                pattern.lastIndex++;
+            }
+            results.push($.trim(match[0]));
+        }
+        return results;
+    };
+});
+
+
+
+</script>
+
+{% endblock %}
