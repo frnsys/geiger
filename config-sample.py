@@ -33,3 +33,9 @@ featurizers = {
 # Where trained models are stored
 models_path = 'data/'
 d2v_path = 'data/comments.doc2vec'
+
+# Whether or not sentences should be the object of examination.
+# If True, treats each sentence as an independent document.
+# If False, operates on comments as a whole (but still returns highlights as
+# sentences).
+sentences = False

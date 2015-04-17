@@ -156,6 +156,8 @@ def get_comments():
     })
 
 
+from geiger.sentences import Sentence
+from nltk.tokenize import sent_tokenize
 @app.route('/api/geiger', methods=['POST'])
 def geigerize():
     """
@@ -175,24 +177,46 @@ def geigerize():
         'replies': [] # ignoring replies for now
     }) for c in data['comments']]
 
-    # Run the specified strategy.
-    raw_results = getattr(geiger, strat)(comments)
-
-    # Format results into something jsonify-able.
+    resolution = 'sentences'
     results = []
-    for r in raw_results:
-        c = r[1]
-        results.append({
-            'sentence': r[0],
-            'comment': {
-                'id': c.id,
-                'body': c.body,
-                'body_html': c.body_html,
-                'author': c.author,
-                'score': c.score
-            },
-            'support': int(r[2]),
-            'cohort': [c.body for c in r[3]]
-        })
+
+    if resolution == 'sentences':
+        # Try out sentences as the object
+        sentences = [[Sentence(sent, c) for sent in sent_tokenize(c.body)] for c in comments]
+        sentences = [s for sents in sentences for s in sents]
+
+        # Run the specified strategy.
+        raw_results = getattr(geiger, strat)(sentences)
+
+        # Format results into something jsonify-able.
+        for r in raw_results:
+            s = r[1]
+            results.append({
+                'sentence': r[0],
+                'comment': {
+                    'id': s.comment.id,
+                    'body': s.body,
+                    'author': s.comment.author
+                },
+                'support': int(r[2]),
+                'cohort': [c.body for c in r[3]]
+            })
+
+    else:
+        raw_results = getattr(geiger, strat)(comments)
+
+        # Format results into something jsonify-able.
+        for r in raw_results:
+            c = r[1]
+            results.append({
+                'sentence': r[0],
+                'comment': {
+                    'id': c.id,
+                    'body': c.body,
+                    'author': c.author
+                },
+                'support': int(r[2]),
+                'cohort': [c.body for c in r[3]]
+            })
 
     return jsonify(results=results)
