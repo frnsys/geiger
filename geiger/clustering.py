@@ -3,8 +3,6 @@ A bunch of different clustering strategies.
 Mostly just wrappers around sklearn implementations :)
 """
 
-import numpy as np
-from galaxy.cluster.ihac import Hierarchy
 from geiger.models.lda import Model as LDA
 from sklearn.cluster import AgglomerativeClustering, KMeans, DBSCAN
 
@@ -51,37 +49,6 @@ def dbscan(comments, featurizer, return_ctx=False, return_labels=False):
     """
     m = DBSCAN(metric='euclidean', eps=0.6, min_samples=3)
     return _cluster(comments, m, featurizer, return_ctx=return_ctx, return_labels=return_labels)
-
-
-def ihac(comments, featurizer, return_ctx=False, dist_cutoff=None):
-    """
-    Incremental hierarchical agglomerative clustering
-    """
-    h = Hierarchy(metric='cosine', lower_limit_scale=0.9, upper_limit_scale=1.2)
-
-    if return_ctx:
-        X, ctx = featurizer.featurize(comments, return_ctx=True)
-    else:
-        X = featurizer.featurize(comments)
-
-    ids = h.fit(X)
-    avg_distances, lvl_avgs = h.avg_distances()
-
-    # Default cutoff, needs to be tweaked
-    if dist_cutoff is None:
-        dist_cutoff = np.mean(lvl_avgs)
-
-    # Build a map of hierarchy ids to comments.
-    if return_ctx:
-        map = {ids[i]: (c, ctx[i]) for i, c in enumerate(comments)}
-    else:
-        map = {ids[i]: (c, ctx[i]) for i, c in enumerate(comments)}
-
-    # Generate the clusters.
-    clusters = h.clusters(distance_threshold=dist_cutoff, with_labels=False)
-
-    # Get the clusters as comments.
-    return [[map[id] for id in clus] for clus in clusters]
 
 
 def _cluster(comments, model, featurizer, return_ctx=False, return_labels=False):

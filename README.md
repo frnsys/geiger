@@ -2,9 +2,6 @@
 
 (work in progress - for details, see the [proposal](proposal/proposal.md).)
 
-The IHAC clustering strategy relies on my implementation of IHAC in [galaxy](https://github.com/ftzeng/galaxy) which is still kind of finicky.
-
-
 ## Usage
 
 Install requirements:
@@ -47,9 +44,13 @@ This will output the selections from a variety of different strategies.
 
 To visualize the output of a clustering strategy (for debugging/tweaking purposes):
 
-    localhost:5001/visualize_strat/[lda, hac, ihac, k_means, dbscan]
-    localhost:5001/visualize_strat/[lda, hac, ihac, k_means, dbscan]/<NYT article url>
+    localhost:5001/visualize/[lda, hac, k_means, dbscan]
+    localhost:5001/visualize/[lda, hac, k_means, dbscan]/<NYT article url>
 
+To see the results of the baseline ("talked about") algorithm:
+
+    localhost:5001/talked-about
+    localhost:5001/talked-about/<NYT article url>
 
 ### Recommendations
 

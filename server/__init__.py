@@ -50,7 +50,6 @@ def visualize(strategy, url):
     strats = {
         'lda': clustering.lda,
         'hac': clustering.hac,
-        'ihac': clustering.ihac,
         'k_means': clustering.k_means,
         'dbscan': clustering.dbscan
     }
