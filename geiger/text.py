@@ -9,9 +9,9 @@ from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer, H
 from sklearn.decomposition import TruncatedSVD
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import Normalizer
-from nltk.tokenize import sent_tokenize, word_tokenize
+from nltk.tokenize import word_tokenize
 from nltk.stem.wordnet import WordNetLemmatizer
-from nltk.corpus import stopwords
+from nltk.corpus import stopwords, wordnet
 
 
 class Vectorizer():
@@ -120,12 +120,10 @@ def strip_tags(html):
     return s.get_data()
 
 
-punct_map = {ord(p): ' ' for p in string.punctuation + '“”'}
-period_map = {ord('.'): None} # To preserve initialisms, e.g. F.D.A. -> FDA
-def strip_punct(doc, keep_periods=True):
-    if keep_periods:
-        return doc.translate(period_map).translate(punct_map)
-    return doc.translate(punct_map)
+dash_map = {ord(p): ' ' for p in '—-'}
+punct_map = {ord(p): '' for p in string.punctuation + '“”'}
+def strip_punct(doc):
+    return doc.translate(dash_map).translate(punct_map)
 
 
 def html_decode(s):
@@ -143,3 +141,98 @@ def html_decode(s):
         ):
         s = s.replace(code[1], code[0])
     return s
+
+
+
+
+
+from gensim.models import Phrases
+from nytnlp.keywords import rake
+from textblob import Blobber
+from textblob_aptagger import PerceptronTagger
+blob = Blobber(pos_tagger=PerceptronTagger())
+stops = stopwords.words('english')
+lem = WordNetLemmatizer()
+dash_map = {ord(p): ' ' for p in '—-'}
+punct_map = {ord(p): '' for p in string.punctuation + '“”—’‘'}
+
+# Trained on 100-200k NYT articles
+bigram = Phrases.load('data/bigram_model.phrases')
+
+def clean_doc(doc):
+    doc = doc.lower()
+    doc = doc.replace('\'s ', ' ')
+    doc = doc.translate(dash_map)
+    doc = doc.translate(punct_map)
+    return doc
+
+
+def keyword_tokenize(doc):
+    """
+    Tokenizes a document so that only keywords and phrases
+    are returned. Keywords are returned as lemmas.
+    """
+    doc = clean_doc(doc)
+    blo = blob(doc)
+
+    # Only process tokens which are keywords
+    kws = rake.extract_keywords(doc)
+
+    # Split phrase keywords into 1gram keywords,
+    # to check tokens against
+    kws_1g = [kw.split(' ') for kw in kws]
+    kws_1g = [kw for grp in kws_1g for kw in grp]
+
+    # Extract keyphrases
+    phrases = [ph.replace('_', ' ') for ph in bigram[blo.words]]
+    phrases = [ph for ph in blo.noun_phrases + phrases if gram_size(ph) > 1]
+
+    toks = []
+    for tok, tag in blo.tags:
+        if tok not in stops and tok in kws_1g:
+            wn_tag = penn_to_wordnet(tag)
+            if wn_tag is not None:
+                toks.append(lem.lemmatize(tok, wn_tag))
+    toks += phrases
+    return toks
+
+
+def lemma_forms(lemma, doc):
+    """
+    Extracts all forms for a given term in a given document.
+    """
+    doc = clean_doc(doc)
+    blo = blob(doc)
+
+    results = []
+    for tok, tag in blo.tags:
+        wn_tag = penn_to_wordnet(tag)
+        if wn_tag is None:
+            continue
+        l = lem.lemmatize(tok, wn_tag)
+        if l != lemma:
+            continue
+        results.append(tok)
+    return results
+
+
+def gram_size(term):
+    """
+    Convenience func for getting n-gram length.
+    """
+    return len(term.split(' '))
+
+
+def penn_to_wordnet(tag):
+    """
+    Convert a Penn Treebank PoS tag to WordNet PoS tag.
+    """
+    if tag in ['NN', 'NNS', 'NNP', 'NNPS']:
+        return wordnet.NOUN
+    elif tag in ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']:
+        return wordnet.VERB
+    elif tag in ['RB', 'RBR', 'RBS']:
+        return wordnet.ADV
+    elif tag in ['JJ', 'JJR', 'JJS']:
+        return wordnet.ADJ
+    return None

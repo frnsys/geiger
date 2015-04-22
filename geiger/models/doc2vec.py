@@ -1,9 +1,7 @@
 import os
-import string
 import config
 from time import time
 from nltk import word_tokenize
-from nltk.corpus import stopwords
 from geiger.util.progress import Progress
 from gensim.models.doc2vec import Doc2Vec, LabeledSentence
 
@@ -73,7 +71,7 @@ class Model():
         self.m = Doc2Vec(
                 sentences=self._doc_stream(data_paths),
                 train_lbls=False,       # only train word representations
-                workers=5,              # multithreading
+                workers=4,              # multithreading
                 min_count=50,           # ignore words with frequency less than this
                 size=300,               # dimensionality of feature vectors
                 sample=0.001,           # threshold for which higher-frequency words are randomly downsampled
@@ -139,12 +137,3 @@ class Model():
         """
         tokens = self._tokenize(doc)
         return self.m.infer_vector(tokens)
-
-
-    stops = stopwords.words('english')
-    def _infer_tokenize(self, doc):
-        """
-        not sure if this helps
-        """
-        doc = strip_punct(doc)
-        return [t for t in word_tokenize(doc) if t not in self.stops]

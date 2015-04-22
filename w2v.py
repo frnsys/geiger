@@ -5,10 +5,10 @@ that way it doesn't need to keep being reloaded.
 
 # Listener
 from multiprocessing.connection import Listener
-from geiger.models.doc2vec import Model as Doc2Vec
+from gensim.models.word2vec import Word2Vec
 
-print('Loading Doc2Vec model...')
-m = Doc2Vec()
+print('Loading word2vec model...')
+w2v = Word2Vec.load_word2vec_format('data/GoogleNews-vectors-negative300.bin', binary=True)
 
 print('Creating listener...')
 address = ('localhost', 6000)
@@ -19,6 +19,9 @@ with Listener(address, authkey=b'password') as listener:
             while True:
                 try:
                     msg = conn.recv()
-                    conn.send(m.infer_vector(msg))
+                    try:
+                        conn.send(w2v.similarity(*msg))
+                    except KeyError:
+                        conn.send(0.)
                 except (EOFError, ConnectionResetError):
                     break

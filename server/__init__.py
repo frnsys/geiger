@@ -1,3 +1,4 @@
+import os
 import json
 import config
 import geiger
@@ -21,7 +22,8 @@ def index():
         'aspects_only_pos',
         'aspects_only_rake',
         'aspects_only_apriori',
-        'baseline'
+        'sem_sim',
+        'extract_random'
     ]
 
     resolution = 'sentences' if config.sentences else 'comments'
@@ -34,27 +36,7 @@ def visualize(strategy, url):
     """
     For more closely examining different clustering strategies.
     """
-
-    if url:
-        comments = services.get_comments(url, n=300)
-        comments = [c for c in comments if len(c.body) > 140]
-
-    else:
-        path_to_examples = 'data/examples.json'
-        clusters = json.load(open(path_to_examples, 'r'))
-        docs = []
-        for clus in clusters:
-            for doc in clus:
-                docs.append(doc)
-
-        docs = [strip_tags(doc) for doc in docs if len(doc) >= 140] # drop short comments :D
-
-        class FauxComment():
-            def __init__(self, body):
-                self.body_html = body
-                self.body = strip_tags(body)
-
-        comments = [FauxComment(d) for d in docs]
+    title, body, comments = _fetch_asset(url)
 
     strats = {
         'lda': clustering.lda,
@@ -76,6 +58,15 @@ def visualize(strategy, url):
     return render_template('visualize.html', clusters=clusters, strategies=list(strats.keys()), strategy=strategy, featurizers=config.featurizers, url=url)
 
 
+from geiger.baseline import extract_highlights
+@app.route('/baseline', defaults={'url':''})
+@app.route('/baseline/<path:url>')
+def baseline(url):
+    title, body, comments = _fetch_asset(url)
+    highlights = extract_highlights(comments)
+    return render_template('baseline.html', highlights=highlights)
+
+
 @app.route('/annotate')
 def annotate():
     """
@@ -90,9 +81,9 @@ def save_annotations():
     Save the annotations from the frontend.
     """
     data = request.get_json()
-    title = data['subject']['title']
+    fname = data['subject']['url'].replace('/', '_')
 
-    with open('data/annotations/{0}.json'.format(title), 'w') as f:
+    with open('data/annotations/{0}.json'.format(fname), 'w') as f:
         json.dump(data, f)
 
     return jsonify({
@@ -107,42 +98,7 @@ def get_comments():
     Gets asset data (title, body) and comments for a given NYT article url.
     """
     url = request.args['url']
-    if url:
-        asset = services.get_asset(url)['result']
-
-        if asset is None:
-            raise Exception('Couldn\'t find an asset matching the url {0}'.format(url))
-        elif 'article' in asset:
-            body = asset['article']['body']
-            title = asset['article']['print_information']['headline']
-        elif 'blogpost' in asset:
-            body = asset['blogpost']['post_content']
-            title = asset['blogpost']['post_title']
-        else:
-            raise Exception('Unrecognized asset')
-
-        comments = services.get_comments(url, n=300)
-        comments = [c for c in comments if len(c.body) > 140]
-
-    else:
-        body = '(using example data)'
-        title = 'Example Data'
-
-        class FauxComment():
-            def __init__(self, body, id):
-                self.id = id
-                self.body = strip_tags(body)
-                self.body_html = body
-                self.author = 'some author'
-                self.score = 0
-
-        path_to_examples = 'data/examples.json'
-        clusters = json.load(open(path_to_examples, 'r'))
-        docs = []
-        for clus in clusters:
-            for doc in clus:
-                docs.append(doc)
-        comments = [FauxComment(d, i) for i, d in enumerate(docs) if len(doc) > 140]
+    title, body, comments = _fetch_asset(url)
 
     return jsonify({
         'body': body,
@@ -178,10 +134,8 @@ def geigerize():
         'replies': [] # ignoring replies for now
     }) for c in data['comments']]
 
-    resolution = 'sentences'
     results = []
-
-    if resolution == 'sentences':
+    if config.sentences:
         # Try out sentences as the object
         sentences = [[Sentence(sent, c) for sent in sent_tokenize(c.body)] for c in comments]
         sentences = [s for sents in sentences for s in sents]
@@ -221,3 +175,98 @@ def geigerize():
             })
 
     return jsonify(results=results)
+
+
+@app.route('/api/annotated_comments', methods=['GET'])
+def get_annotated_comments():
+    """
+    Gets asset data (title, body) and comments for a given NYT article url.
+    If annotated comments exist, load those.
+    """
+    url = request.args['url']
+
+    # Check if there are existing annotations.
+    fname = url.replace('/', '_')
+    path = 'data/annotations/{0}.json'.format(fname)
+    if os.path.exists(path):
+        with open(path, 'r') as f:
+            data = json.load(f)
+
+        # ugh should standardize this :\
+        # Format the data properly.
+        return jsonify({
+            'body': data['subject']['body'],
+            'title': data['subject']['title'],
+            'comments': list(data['comments'].values()),
+            'selections': data['selections']
+        })
+
+    # Otherwise, get the data.
+    title, body, comments = _fetch_asset(url)
+
+    # Precluster.
+    f = Featurizer()
+    clusters = clustering.k_means(comments, f)
+    for i, clus in enumerate(clusters):
+        for com in clus:
+            com.cluster = i
+
+    return jsonify({
+        'body': body,
+        'title': title,
+        'comments': [{
+            'id': c.id,
+            'body': c.body,
+            'body_html': c.body_html,
+            'author': c.author,
+            'score': c.score,
+            'cluster': c.cluster,
+            'notes': ''
+        } for c in comments],
+        'selections': [[] for i in clusters]
+    })
+
+
+def _fetch_asset(url):
+    """
+    Fetch an asset and its comments,
+    using the example data if the url is empty.
+    """
+    if url:
+        asset = services.get_asset(url)['result']
+
+        if asset is None:
+            raise Exception('Couldn\'t find an asset matching the url {0}'.format(url))
+        elif 'article' in asset:
+            body = asset['article']['body']
+            title = asset['article']['print_information']['headline']
+        elif 'blogpost' in asset:
+            body = asset['blogpost']['post_content']
+            title = asset['blogpost']['post_title']
+        else:
+            raise Exception('Unrecognized asset')
+
+        comments = services.get_comments(url, n=300)
+        comments = [c for c in comments if len(c.body) > 140]
+
+    else:
+        body = '(using example data)'
+        title = 'Example Data'
+
+        class FauxComment():
+            def __init__(self, body, id):
+                self.id = id
+                self.body = strip_tags(body)
+                self.body_html = body
+                self.author = 'some author'
+                self.score = 0
+
+        path_to_examples = 'data/examples.json'
+        clusters = json.load(open(path_to_examples, 'r'))
+        docs = []
+        for clus in clusters:
+            for doc in clus:
+                docs.append(doc)
+        comments = [FauxComment(d, i) for i, d in enumerate(docs) if len(doc) > 140]
+
+    return title, body, comments

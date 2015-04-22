@@ -86,7 +86,7 @@ class Featurizer():
         advbs = {'RB', 'RBR', 'RBS'}
         pronouns = {'PRP', 'PRP$'}
 
-        n_total = len(tags)
+        n_total = len(tags) if len(tags) != 0 else 1
         n_nouns = len([t for t in tags if t in nouns])
         n_adjs = len([t for t in tags if t in adjs])
         n_advbs = len([t for t in tags if t in advbs])

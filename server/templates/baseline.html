@@ -1,0 +1,26 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+
+<style>
+.highlight {
+    font-weight: bold;
+    color: #EB1B23;
+}
+</style>
+
+<div class="comments">
+
+    {% for k, v in highlights %}
+        <h1>{{ k }}</h1>
+        <ul class="thread">
+            {% for h in v %}
+                <li class="comment">
+                    {{ h|safe }}
+                </li>
+            {% endfor %}
+        </ul>
+    {% endfor %}
+</div>
+
+{% endblock %}

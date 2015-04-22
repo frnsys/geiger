@@ -21,19 +21,31 @@ def prefilter(sentence):
     final_char = tokens[-1][-1]
 
     # Filter out short sentences.
-    if len(tokens) < 10:
+    if len(tokens) <= 12:
+        return False
+
+    # No questions
+    elif '?' in sentence:
+        return False
+
+    # No quotes
+    elif any((c in {'"\'‘’“”'}) for c in sentence):
+        return False
+
+    # Should begin with an uppercase (catches improperly tokenized sentences)
+    elif not sentence[0].isupper():
         return False
 
     # The following rules are meant to filter out sentences
     # which may require extra context.
     elif first_char in ['"', '(', '\'', '*', '“', '‘', ':']:
         return False
-    elif first_word in ['however', 'so', 'for', 'or', 'and', 'thus', 'therefore', 'also', 'firstly', 'secondly', 'thirdly']:
+    elif first_word in ['however', 'but', 'so', 'for', 'or', 'and', 'thus', 'therefore', 'also', 'firstly', 'secondly', 'thirdly']:
         return False
     # TO DO perhaps this should only check if these are in the first n words
-    elif set(tokens).intersection({'he', 'she', 'it', 'they', 'them', 'him', 'her', 'their', 'I'}):
+    elif set(tokens).intersection({'he', 'she', 'it', 'they', 'them', 'him', 'her', 'their', 'i'}):
         return False
-    elif final_char in ['"', '”', '’']:
+    elif final_char in ['"', '”', '’', "'"]:
         return False
 
     return True

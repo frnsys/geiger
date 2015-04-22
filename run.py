@@ -1,9 +1,5 @@
 import sys
 import json
-import pandas as pd
-from sklearn.externals import joblib
-
-import config
 from server import app
 
 from geiger.comment import Doc
@@ -35,22 +31,7 @@ def server():
     """
     Run the demo server.
     """
-    app.run(debug=True, port=5001)
-
-
-def comments():
-    """
-    Download up to the first 300 comments for a given NYT article url.
-    """
-    from geiger.services import get_comments
-    url = sys.argv[2]
-
-    comments = get_comments(url, n=300)
-
-    texts = [c.body for c in comments]
-
-    with open('out.txt', 'w') as f:
-        f.write('\n\n\n\n\n'.join(texts))
+    app.run(host='0.0.0.0', debug=True, port=5001)
 
 
 def eval():

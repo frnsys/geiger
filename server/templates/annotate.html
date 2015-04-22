@@ -1,14 +1,5 @@
 {% extends 'layout.html' %}
 
-{% macro render_comment(c, ctx) -%}
-    <li class="node comment">
-        <p class="body">{{ c.body_html|safe|truncate(70) }}</p>
-        <ul class="context">
-            <li>{{ c.body_html|safe }}</li>
-        </ul>
-    </li>
-{%- endmacro %}
-
 {% block content %}
 
 <style>
@@ -37,8 +28,8 @@
     background: #f0f0f0;
     font-size: 0.8em;
     z-index: 10;
-    top: 5em;
     left: 2em;
+    top: 100%;
     padding: 2em 4em;
     width: 320px;
     white-space: normal;
@@ -89,6 +80,15 @@ ul > li {
 .sentence:hover {
     background: #64D68A;
 }
+.selected-comment .body {
+    border: 4px solid #8789FF;
+}
+textarea {
+    width: 100%;
+    height: 5em;
+    border: none;
+    font-size: 0.9em;
+}
 </style>
 
 <header class="primary-header">
@@ -116,12 +116,15 @@ ul > li {
 <div class="tooltip hide">
     <h6>Current Selection</h6>
     <span class="current-selection"></span>
-    <span class="tip">(press "s" to save, "c" to clear)</span>
+    <span class="tip">(press "f" to save, "c" to clear)</span>
 </div>
 
 <script type="text/html" id="node_tmpl">
     <li class="node" data-id="{3}">
-        <div class="body" style="background-color:#{0};">{1}</div>
+        <div class="body" style="background-color:#{0};">
+            <p>{1}</p>
+            <textarea class="notes">{4}</textarea>
+        </div>
         <div class="context hide">{2}</div>
     </li>
 </script>
@@ -160,33 +163,14 @@ $(function() {
         $(this).find('> .context').hide();
     });
 
-    // Change comment cluster membership on click.
+    // Select a comment on click.
     $('body').on('mousedown', '.node .body', function() {
-        var id = $(this).parent().data('id'),
-            comment = comments[id],
-            clus_sels = selections[comment.cluster];
-
-        // Move to new cluster.
-        comment.cluster += 1;
-        if (comment.cluster >= n_clus) {
-            comment.cluster = 0;
-        }
-
-        // Grab selections from this comment to move to the new cluster.
-        // there's def a better way to do this, but i'm too tired atm
-        for (var i = clus_sels.length - 1; i >= 0; i--) {
-            if (clus_sels[i].comment_id == id) {
-                selections[comment.cluster].push(clus_sels[i]);
-                clus_sels.splice(i, 1);
-            }
-        }
-
-        $(this).css('background-color', '#'+color_map[comment.cluster]);
+        $('.selected-comment').removeClass('selected-comment');
+        $(this).closest('.node').addClass('selected-comment');
     });
 
     // Select a selection by selecting text.
     $('body').on('mouseup', '.node .context', function() {
-        // yyeeEEAAAHhHH
         var id = $(this).closest('.node').data('id'),
             comment = comments[id],
             text = $.trim(window.getSelection().toString());
@@ -208,35 +192,119 @@ $(function() {
         }
     });
 
-    function make_selection(text, comment) {
-        // Store the selection.
-        selection = {
-            comment_id: comment.id,
-            text: text
-        }
+    $('body').on('keyup', 'textarea', function() {
+        var id = $(this).closest('.node').data('id'),
+            comment = comments[id],
+            text = $(this).val();
 
-        $('.tooltip').show();
-        $('.tooltip .current-selection').text(selection.text);
-    }
+        comment.notes = text;
+    });
 
-    // Re-render clusters when 'r' is pressed.
-    // Save a selection when 's' is pressed.
-    // Clear a selection when 'c' is pressed.
+    // This is prooobably overkill
     $('body').on('keydown', function(ev) {
-        if (ev.keyCode == 82) {
-            render_clusters();
+        if (ev.ctrlKey) {
+            // I may come to regret this
+            ev.preventDefault();
+            switch (ev.keyCode) {
 
-        } else if (ev.keyCode == 83) {
-            if (selection !== null && selections.indexOf(selection) === -1) {
-                var clus = comments[selection.comment_id].cluster;
-                selections[clus].push(selection);
-                selection = null;
-                $('.tooltip').hide();
+                // r: re-render clusters
+                case 82:
+                    render_clusters();
+                    break;
+
+                // z: save Annotations
+                case 90:
+                    save();
+                    break;
+
+                // f: save sentence selection
+                case 70:
+                    if (selection !== null && selections.indexOf(selection) === -1) {
+                        var clus = comments[selection.comment_id].cluster;
+                        selections[clus].push(selection);
+                        selection = null;
+                        $('.tooltip').hide();
+                        render_clusters();
+                    }
+                    break;
+
+                // c: clear sentence selection
+                case 67:
+                    selection = null;
+                    $('.tooltip').hide();
+                    break;
+
+                // [: left
+                case 219:
+                    move_selection_left();
+                    break;
+
+                // a: left
+                case 65:
+                    move_selection_left();
+                    break;
+
+                // h: left
+                case 72:
+                    move_selection_left();
+                    break;
+
+                // ]: right
+                case 221:
+                    move_selection_right();
+                    break;
+
+                // d: right
+                case 68:
+                    move_selection_right();
+                    break;
+
+                // l: right
+                case 76:
+                    move_selection_right();
+                    break;
+
+                // -: switch cluster down
+                case 173:
+                    var id = $('.selected-comment').data('id');
+                    reassign_comment(id, 'dec');
+                    break;
+
+                // s: switch cluster down
+                case 83:
+                    var id = $('.selected-comment').data('id');
+                    reassign_comment(id, 'dec');
+                    break;
+
+                // j: switch cluster down
+                case 74:
+                    var id = $('.selected-comment').data('id');
+                    reassign_comment(id, 'dec');
+                    break;
+
+                // +: switch cluster up
+                case 61:
+                    var id = $('.selected-comment').data('id');
+                    reassign_comment(id, 'inc');
+                    break;
+
+                // w: switch cluster up
+                case 87:
+                    var id = $('.selected-comment').data('id');
+                    reassign_comment(id, 'inc');
+                    break;
+
+                // k: switch cluster up
+                case 75:
+                    var id = $('.selected-comment').data('id');
+                    reassign_comment(id, 'inc');
+                    break;
             }
 
-        } else if (ev.keyCode == 67) {
-            selection = null;
-            $('.tooltip').hide();
+            // Jump to clusters using the number keys.
+            if ([49,50,51,52,53,54].indexOf(ev.keyCode) > -1) {
+                scroll_to_cluster(ev.keyCode - 49);
+            }
         }
     });
 
@@ -271,7 +339,7 @@ $(function() {
         $('.subject .error, .subject--controls').hide();
         $('.subject .loading').show();
         $('.clusters').empty();
-        $.ajax('/api/comments', {
+        $.ajax('/api/annotated_comments', {
             method: 'GET',
             accepts: 'application/json',
             data: {
@@ -284,14 +352,15 @@ $(function() {
                 comments = {};
                 for (var i = 0; i < data.comments.length; i++) {
                     var comment = data.comments[i];
-                    comment.cluster = 0;
                     comments[comment.id] = comment;
                 }
+                selections = data.selections;
                 render_clusters();
 
                 subject = {
                     title: data.title,
-                    body: data.body
+                    body: data.body,
+                    url: url
                 };
                 $('.subject--title').text(subject.title);
                 $('.subject--body').html(subject.body);
@@ -342,7 +411,8 @@ $(function() {
                             color_map[i],
                             comment.body.substring(0, 60),
                             body_html,
-                            comment.id);
+                            comment.id,
+                            comment.notes);
                 }
 
                 // Render selections.
@@ -397,6 +467,84 @@ $(function() {
         }
         return results;
     };
+
+    // Reassign a comment to a different cluster.
+    function reassign_comment(id, dir) {
+        var comment = comments[id],
+            clus_sels = selections[comment.cluster];
+
+        // Move to new cluster.
+        if (dir === 'inc') {
+            comment.cluster++;
+            if (comment.cluster >= n_clus) {
+                comment.cluster = 0;
+            }
+        } else {
+            comment.cluster--;
+            if (comment.cluster < 0) {
+                comment.cluster = n_clus - 1;
+            }
+        }
+
+        // Grab selections from this comment to move to the new cluster.
+        // there's def a better way to do this, but i'm too tired atm
+        for (var i = clus_sels.length - 1; i >= 0; i--) {
+            if (clus_sels[i].comment_id == id) {
+                selections[comment.cluster].push(clus_sels[i]);
+                clus_sels.splice(i, 1);
+            }
+        }
+
+        $('.selected-comment .body').css('background-color', '#'+color_map[comment.cluster]);
+    }
+
+    // Scroll to a cluster by its id (number).
+    function scroll_to_cluster(id) {
+        var clus_el = $('[data-cluster={0}]'.format(id));
+        if (clus_el.length > 0)
+            $(window).scrollTop(clus_el.position().top);
+    }
+
+    function make_selection(text, comment) {
+        // Store the selection.
+        selection = {
+            comment_id: comment.id,
+            text: text
+        }
+
+        $('.tooltip').show();
+        $('.tooltip .current-selection').text(selection.text);
+    }
+
+    function move_selection_right() {
+        var idx = $('.node').index($('.selected-comment')),
+            tot = $('.node').length;
+
+        idx++;
+        if (idx >= tot)
+            idx = 0;
+
+        $('.selected-comment .context').hide();
+        $('.selected-comment').removeClass('selected-comment');
+        $('.cluster .node').eq(idx).addClass('selected-comment');
+        $('.selected-comment .context').show();
+        $('.selected-comment textarea').focus();
+    }
+
+    function move_selection_left() {
+        var idx = $('.node').index($('.selected-comment')),
+            tot = $('.node').length;
+
+        idx--;
+        if (idx < 0)
+            idx = tot - 1;
+
+        $('.selected-comment .context').hide();
+        $('.selected-comment').removeClass('selected-comment');
+        $('.cluster .node').eq(idx).addClass('selected-comment');
+        $('.selected-comment .context').show();
+        $('.selected-comment textarea').focus();
+    }
 });
 
 

@@ -1,6 +1,6 @@
 import random
 from nltk.tokenize import sent_tokenize
-from geiger import clustering, sentences
+from geiger import clustering, sentences, semsim
 from geiger.featurizers import Featurizer
 
 """
@@ -53,9 +53,13 @@ def aspects_only_apriori(comments):
     return sentences.extract_by_apriori(comments)
 
 
-def baseline(comments):
+def sem_sim(comments):
+    return semsim.semsim(comments)
+
+
+def extract_random(comments):
     """
-    Baseline: select 5 random sentences.
+    Select 5 random sentences.
     """
     sents = []
     for c in comments:
