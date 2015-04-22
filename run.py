@@ -4,20 +4,7 @@ from server import app
 
 from geiger.comment import Doc
 from geiger.util.evaluate import evaluate
-from geiger.models.doc2vec import Model as Doc2Vec
 from geiger.models.polisent import Model as Polisent
-
-
-def train_doc2vec():
-    """
-    Train the doc2vec model.
-    """
-    m = Doc2Vec()
-    m.train([
-        'data/all_approved_comments_01.csv',
-        'data/all_approved_comments_02.csv',
-        'data/all_approved_comments_03.csv'
-    ])
 
 
 def train_polisent():

@@ -14,6 +14,10 @@ h1 {
     font-weight: 700;
     font-size: 1.5em;
 }
+h5 {
+    font-family: "nyt-stymie";
+    font-weight: 700;
+}
 header h1 {
     margin: 0.5em 1em;
     float: left;
@@ -75,7 +79,7 @@ li {
     line-height: 1.5;
     font-family: "georgia", "times new roman","times","serif";
 }
-.subject .error, .loading {
+.subject .error, .talked-about .error, .loading {
     font-family: "nyt-franklin",arial,helvetica,sans-serif;
     text-align: center;
 }
@@ -150,6 +154,13 @@ button {
 }
 .thread .thread .comment {
     margin-top: 1px;
+}
+.highlight {
+    font-weight: bold;
+    color: #EB1B23;
+}
+.talked-about {
+    padding: 4em 0 8em 0;
 }
 
 /* Loader by Tobias Ahlin */

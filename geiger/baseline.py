@@ -1,8 +1,12 @@
 import re
+import json
 from itertools import combinations
 from nltk.tokenize import sent_tokenize
 from geiger.text import keyword_tokenize, gram_size, lemma_forms
-from geiger.sentences import prefilter
+from geiger.sentences import prefilter, Sentence
+
+
+idf = json.load(open('data/idf.json', 'r'))
 
 
 def highlight(term, doc):
@@ -10,10 +14,10 @@ def highlight(term, doc):
     Highlights each instance of the given term
     in the document. All forms of the term will be highlighted.
     """
-
     # Determine which forms are present for the term in the document
     if gram_size(term) == 1:
-        forms = lemma_forms(term, doc)
+        # Replace longer forms first so we don't replace their substrings.
+        forms = sorted(lemma_forms(term, doc), key=lambda f: len(f), reverse=True)
     else:
         forms = [term]
 
@@ -44,18 +48,17 @@ def highlight(term, doc):
 
 def extract_highlights(comments):
     # Filter by minimum comment requirements
-    docs = [c.body for c in comments]
-    docs = [doc for doc in docs if len(doc) > 140]
+    comments = [c for c in comments if len(c.body) > 140]
 
     # Get sentences, filtered fairly aggressively
-    sents = [[sent for sent in sent_tokenize(doc) if prefilter(sent)] for doc in docs]
+    sents = [[Sentence(sent, c) for sent in sent_tokenize(c.body) if prefilter(sent)] for c in comments]
     sents = [sent for s in sents for sent in s]
 
     print('{0} sentences...'.format(len(sents)))
 
     senters = []
     for sent in sents:
-        tokens = set(keyword_tokenize(sent))
+        tokens = set(keyword_tokenize(sent.body))
         senters.append((sent, tokens))
 
 
@@ -86,7 +89,19 @@ def extract_highlights(comments):
     # Take the top 5 supported aspects
     # Prioritize keyphrases over keywords
     highlights = []
-    for k in sorted(aspect_map, key=lambda k: gram_size(k) * len(aspect_map[k]), reverse=True)[:10]:
-        highlights.append((k, [highlight(k, sent) for sent in aspect_map[k]]))
+    for k in sorted(aspect_map, key=score(aspect_map), reverse=True)[:10]:
+        aspect_sents = sorted(aspect_map[k], key=lambda s: s.comment.score, reverse=True)
+        aspect_sents = [(sent, highlight(k, sent.body)) for sent in aspect_sents]
+        highlights.append((k, aspect_sents[0], aspect_sents[1:]))
 
     return highlights
+
+
+def score(aspect_map):
+    """
+    Emphasize phrases and salient keys (as valued by idf).
+    """
+    def _score(k):
+        # Mean IDF was ~15.2, so slightly bias unencountered terms.
+        return idf.get(k, 15.5)**2 * len(aspect_map[k]) * gram_size(k)
+    return _score

@@ -6,6 +6,7 @@ from geiger.text import strip_tags
 from geiger.comment import Comment
 from geiger import services, clustering
 from geiger.featurizers import Featurizer
+from geiger.baseline import extract_highlights
 from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__, static_folder='static', static_url_path='')
@@ -28,6 +29,14 @@ def index():
 
     resolution = 'sentences' if config.sentences else 'comments'
     return render_template('index.html', strategies=strats, featurizers=config.featurizers, resolution=resolution)
+
+
+@app.route('/talked-about', defaults={'url':''})
+@app.route('/talked-about/<path:url>')
+def talked_about_preview(url):
+    title, body, comments = _fetch_asset(url)
+    highlights = extract_highlights(comments)
+    return render_template('talked_about.html', highlights=highlights)
 
 
 @app.route('/visualize/<strategy>/', defaults={'url':''})
@@ -56,15 +65,6 @@ def visualize(strategy, url):
             clusters = strats[strategy](comments, f, return_ctx=True)
 
     return render_template('visualize.html', clusters=clusters, strategies=list(strats.keys()), strategy=strategy, featurizers=config.featurizers, url=url)
-
-
-from geiger.baseline import extract_highlights
-@app.route('/baseline', defaults={'url':''})
-@app.route('/baseline/<path:url>')
-def baseline(url):
-    title, body, comments = _fetch_asset(url)
-    highlights = extract_highlights(comments)
-    return render_template('baseline.html', highlights=highlights)
 
 
 @app.route('/annotate')
@@ -162,17 +162,52 @@ def geigerize():
 
         # Format results into something jsonify-able.
         for r in raw_results:
-            c = r[1]
+            comment = r[1]
             results.append({
                 'sentence': r[0],
                 'comment': {
-                    'id': c.id,
-                    'body': c.body,
-                    'author': c.author
+                    'id': comment.id,
+                    'body': comment.body,
+                    'author': comment.author
                 },
                 'support': int(r[2]),
                 'cohort': [c.body for c in r[3]]
             })
+
+    return jsonify(results=results)
+
+
+@app.route('/api/talked-about', methods=['POST'])
+def talked_about():
+    data = request.get_json()
+
+    # Wrangle posted comments into the minimal format needed for processing.
+    comments = [Comment({
+        'commentID': c['id'],
+        'commentBody': c['body_html'],
+        'recommendations': c['score'],
+        'userDisplayName': c['author'],
+        'createDate': 0,
+        'replies': [] # ignoring replies for now
+    }) for c in data['comments']]
+    highlights = extract_highlights(comments)
+
+
+    # Format results into something jsonify-able.
+    results = []
+    for r in highlights:
+        sent, body = r[1]
+        results.append({
+            'aspect': r[0],
+            'sentence': body,
+            'comment': {
+                'id': sent.comment.id,
+                'body': sent.comment.body,
+                'author': sent.comment.author
+            },
+            'support': len(r[2]),
+            'cohort': [b for s, b in r[2]]
+        })
 
     return jsonify(results=results)
 

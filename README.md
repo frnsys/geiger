@@ -15,10 +15,21 @@ Setup the config as necessary:
 
     $ cp config-sample.py config.py; vi config.py
 
+Download the necessary corpora:
+
+    $ python -m textblob.download_corpora
+
 If you need to, train the necessary models (i.e. those which power other featurizers).
 For example, the `polisent` featurizer must have its `polisent` model trained:
 
     $ python run.py train_polisent
+
+For the `baseline` strategy, the following must be trained:
+
+    $ python train_phrases.py
+    $ python train_idf.py
+
+You can use any corpus to train these on; I used the body text of about 120k NYT articles and it has worked well. The more, the better, most likely.
 
 Run the server:
 
@@ -44,11 +55,11 @@ To visualize the output of a clustering strategy (for debugging/tweaking purpose
 
 (note: the following isn't quite ready)
 
-It's recommended that you also run the `Doc2Vec` process:
+It's recommended that you also run the `w2v.py` process:
 
-    $ python doc2vec.py
+    $ python w2v.py
 
-The Doc2Vec model I'm using is huge and takes a really long time to load. The `doc2vec.py` script will run it as an independent process with a listener.
+The Word2Vec model is quite big and takes some time to load. The `w2v.py` script will run it as an independent process with a listener, which the `semsim` strategy interfaces with.
 
 
 ## Method
@@ -67,5 +78,4 @@ Clustering strategies other than LDA use these features to generate clusters.
 
 ## To Do
 
-- figure out how to evaluate/compare approaches
 - write a chrome extension to mock the selections on a live NYT page

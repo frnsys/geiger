@@ -2,19 +2,15 @@
 
 {% block content %}
 
-<style>
-.highlight {
-    font-weight: bold;
-    color: #EB1B23;
-}
-</style>
-
 <div class="comments">
 
-    {% for k, v in highlights %}
+    {% for k, v, c in highlights %}
         <h1>{{ k }}</h1>
         <ul class="thread">
-            {% for h in v %}
+            <li class="comment">
+                {{ v[1]|safe }}
+            </li>
+            {% for s, h in c %}
                 <li class="comment">
                     {{ h|safe }}
                 </li>

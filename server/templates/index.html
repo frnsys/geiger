@@ -26,6 +26,16 @@
         <p>Resolution: <b>{{ resolution }}</b></p>
     </div>
 
+    <div class="talked-about">
+        <h1>Talked About</h1>
+        <div class="loading">
+            <div class="loader"></div>
+            <h4>Loading "talked about"...</h4>
+        </div>
+        <div class="error hide"></div>
+        <ul class="thread"></ul>
+    </div>
+
     {% for strat in strategies %}
         <div class="strategy hide" data-strategy="{{ strat }}">
             <header>
@@ -124,6 +134,9 @@
                     $('.subject--title').text(data.title);
                     $('.subject--body').html(data.body);
                     enable_geiger();
+
+                    // Load "talked about" right after
+                    get_talked_about();
                 },
                 complete: function() {
                     $('.subject .loading').hide();
@@ -180,6 +193,48 @@
         function disable_geiger() {
             $('.strategy').hide();
             $('.strategy .thread').empty();
+        }
+
+        function get_talked_about() {
+            var el = $('.talked-about');
+            el.find('.loading').show();
+            $.ajax('/api/talked-about', {
+                method: 'POST',
+                accepts: 'application/json',
+                contentType: 'application/json',
+                dataType: 'json',
+                data: JSON.stringify({
+                    comments: comments
+                }),
+                error: function(xhr, status, err) {
+                    el.find('.error').text(err).show();
+                },
+                success: function(data, status, xhr) {
+                    var data = data.results,
+                        thread = el.find('.thread');
+                    for (var i=0; i < data.length; i++) {
+                        var res = data[i],
+                            coh = '',
+                            hel;
+
+                        // List out the other sentences in this cohort.
+                        for (var j=0; j < res.cohort.length; j++) {
+                            coh += '<li>' + res.cohort[j] + '</li>';
+                        }
+
+                        // Build the highlight HTML.
+                        hel = $('#highlight_tmpl')
+                                .html()
+                                .format(res.sentence, res.comment.author, res.support, res.comment.body, coh);
+
+                        thread.append('<h5>{0}</h5>{1}'.format(res.aspect, hel));
+                    }
+                },
+                complete: function() {
+                    el.find('.loading').hide();
+                }
+            });
+
         }
     });
 </script>
