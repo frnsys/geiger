@@ -15,11 +15,11 @@ To my knowledge, no one has yet tried a similar technique on comments.
 
 ## Motivation
 
-- About 20% of NYT commentable articles since 2014 have 100 or more comments. On popular or controversial stories, there may be hundreds to thousands of comments - of the entire comments dataset, about 2% (5015 articles) had at least 500 comments and 139 articles had over 2000 comments. In these cases it is unrealistic to assume that anyone will read even a significant fraction of the comments.
-- Even in more modest amounts, there may still be too many comments to read all the way through. On average, commentable articles have a mean of 60 comments. If we look at the ~52000 articles with at least 50 comments, the mean rises to 226.
-- Making sense of how people are reacting and what the general opinions are towards something is a very noisy and labor-intensive process. There is a great deal of repetition and redundancy and scattered points, so it is not necessarily time well spent.
-- Considering the varying quality and sheer quantity of comments, readers may be intimidated away and end up joining more manageable discussions on other platforms.
-- It is possible that a reader still wants a general understanding of the sentiment or reaction towards a particular piece, and Geiger could provide an entry point into the conversation on the NYT site.
+- About 20% of NYT commentable articles since 2014 have 100 or more comments. __On popular or controversial stories, there may be hundreds to thousands of comments__ - of the entire comments dataset, about 2% (5015 articles) had at least 500 comments and 139 articles had over 2000 comments. In these cases it is __unrealistic to assume that anyone will read even a significant fraction of the comments__.
+- __Even in more modest amounts, there may still be too many comments to read all the way through__. On average, commentable articles have a mean of 60 comments. If we look at the ~52000 articles with at least 50 comments, the mean rises to 226.
+- __Making sense of how people are reacting__ and what the general opinions are towards something __is a very noisy and labor-intensive process__. There is a great deal of repetition and redundancy and scattered opinions, so it is not necessarily time well spent.
+- Considering the varying quality and sheer quantity of comments, __readers may be intimidated away and end up joining more manageable discussions on other platforms__.
+- It is possible that a reader still wants a general understanding of the sentiment or reaction towards a particular piece, and __Geiger could provide an entry point into the conversation on the NYT site__.
 
 ## Hypothesis
 
