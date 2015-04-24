@@ -9,7 +9,7 @@ class Featurizer():
 
     def __init__(self, n_topics=5):
         self.trained = False
-        self.m = lda.Model(n_topics=n_topics, verbose=True)
+        self.m = lda.Model(n_topics=n_topics, verbose=False)
 
     def featurize(self, comments, return_ctx=False):
         if not self.trained:

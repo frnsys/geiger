@@ -23,7 +23,6 @@ featurizers = {
     'keyword': {},
     'subjectivity': {},
     'opinion': {},
-    'doc2vec': {},
     'polisent': {},
     'topics': {
         'n_topics': 10
@@ -32,7 +31,6 @@ featurizers = {
 
 # Where trained models are stored
 models_path = 'data/'
-d2v_path = 'data/comments.doc2vec'
 
 # Whether or not sentences should be the object of examination.
 # If True, treats each sentence as an independent document.

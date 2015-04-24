@@ -16,17 +16,14 @@ Download the necessary corpora:
 
     $ python -m textblob.download_corpora
 
-If you need to, train the necessary models (i.e. those which power other featurizers).
-For example, the `polisent` featurizer must have its `polisent` model trained:
-
-    $ python run.py train_polisent
-
-For the `baseline` strategy, the following must be trained:
+For the `baseline` ("talked about") strategy, the following must be trained:
 
     $ python train_phrases.py
     $ python train_idf.py
 
 You can use any corpus to train these on; I used the body text of about 120k NYT articles and it has worked well. The more, the better, most likely.
+
+These are used to better identify phrases in text and to have some notion of salience (inverse document frequency).
 
 Run the server:
 
@@ -52,15 +49,17 @@ To see the results of the baseline ("talked about") algorithm:
     localhost:5001/talked-about
     localhost:5001/talked-about/<NYT article url>
 
-### Recommendations
+### Other notes
 
-(note: the following isn't quite ready)
-
-It's recommended that you also run the `w2v.py` process:
+If you are using the `semsim` strategy, you will need to train a Word2Vec model and then run the `w2v.py` process:
 
     $ python w2v.py
 
 The Word2Vec model is quite big and takes some time to load. The `w2v.py` script will run it as an independent process with a listener, which the `semsim` strategy interfaces with.
+
+If you are using the `polisent` featurizer, you must train the `polisent` model:
+
+    $ python run.py train_polisent
 
 
 ## Method
