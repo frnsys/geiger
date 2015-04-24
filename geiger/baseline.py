@@ -1,6 +1,7 @@
 import re
 import json
 from itertools import combinations
+from collections import defaultdict
 from nltk.tokenize import sent_tokenize
 from geiger.text import keyword_tokenize, gram_size, lemma_forms
 from geiger.sentences import prefilter, Sentence
@@ -21,7 +22,6 @@ def highlight(term, doc):
     else:
         forms = [term]
 
-    matches = []
     for t in forms:
         # This captures 'F.D.A' if given 'FDA'
         # yeah, it's kind of overkill
@@ -35,13 +35,7 @@ def highlight(term, doc):
         # ignore
         reg = '(^|{0})({1})($|{0})'.format('[^A-Za-z]', reg)
 
-        matches += [match[1] for match in re.findall(reg, doc, flags=re.IGNORECASE)]
-
-    # Remove dupes
-    matches = set(matches)
-
-    for match in matches:
-        doc = re.sub(match, '<span class="highlight">{0}</span>'.format(match), doc)
+        doc = re.sub(reg, '\g<1><span class="highlight">\g<2></span>\g<3>', doc, flags=re.IGNORECASE)
 
     return doc
 
@@ -78,6 +72,43 @@ def extract_highlights(comments):
             else:
                 keywords.add(t)
 
+    # Try to identify novel phrases
+    # This could probably be more efficient/cleaned up
+    for kws, kws_ in combinations(aspect_map.items(), 2):
+        kw = kws[0]
+        sents = kws[1]
+        kw_ = kws_[0]
+        sents_ = kws_[1]
+
+        # Look for phrases that are space-delimited or joined by 'and'
+        pt = '({0}|{1})(\s)(and\s)?({0}|{1})'.format(kw, kw_)
+        intersect = sents.intersection(sents_)
+
+        if len(intersect) == 0:
+            continue
+
+        # Extract possible phrases and keep track of their counts
+        phrases = defaultdict(int)
+        for sent in intersect:
+            for m in re.findall(pt, sent.body.lower()):
+                phrases[''.join(m)] += 1
+
+        if len(phrases) == 0:
+            continue
+
+        # Get the phrase encountered the most
+        dom_phrase = max(phrases.keys(), key=lambda k: phrases[k])
+        dom_count = phrases[dom_phrase]
+
+        if dom_count/len(intersect) >= 0.8:
+            # Check if this new phrase is contained by an existing keyphrase.
+            parents = [ph for ph in keyphrases if dom_phrase in ph]
+            if parents:
+                continue
+            aspect_map[dom_phrase] = intersect
+            keyphrases.add(dom_phrase)
+
+
     # Prune aspects
     # Check if an aspect is subsumed by another in most cases
     for kw in keywords:
@@ -91,17 +122,25 @@ def extract_highlights(comments):
     highlights = []
     for k in sorted(aspect_map, key=score(aspect_map), reverse=True)[:10]:
         aspect_sents = sorted(aspect_map[k], key=lambda s: s.comment.score, reverse=True)
+        if not aspect_sents:
+            continue
         aspect_sents = [(sent, highlight(k, sent.body)) for sent in aspect_sents]
         highlights.append((k, aspect_sents[0], aspect_sents[1:]))
 
     return highlights
 
 
-def score(aspect_map):
+def score(aspect_map, min_sup=5):
     """
     Emphasize phrases and salient keys (as valued by idf).
     """
     def _score(k):
+        support = len(aspect_map[k])
+
+        # Require some minimum support.
+        if support < min_sup:
+            return 0
+
         # Mean IDF was ~15.2, so slightly bias unencountered terms.
-        return idf.get(k, 15.5)**2 * len(aspect_map[k]) * gram_size(k)
+        return idf.get(k, 15.5)**2 * support * gram_size(k)
     return _score
