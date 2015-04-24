@@ -1,37 +1,7 @@
-# Geiger: Comment Highlights
+# Geiger
+## Get a sense of the comments from a safe distance
 
-Here I propose an automated system for grouping similar comments and then identifying the best representative from each group. These selections can be used to construct a high-level summary of the discussion in the comments, which is useful to readers who may be interested in the general response towards a piece, but unwilling to wade through many comments. This summary can function as an alternate entry point to the comments if these highlights link back to their original comments.
-
-## Motivation
-
-On popular or controversial stories, there may be hundreds to thousands of comments. In these cases it is unrealistic to assume that anyone will read even a significant fraction of the comments. Even in more modest amounts (<100), there may still be too many comments to read all the way through. Making sense of how people are reacting and what the general opinions are towards something is a very noisy and labor-intensive process. Considering the varying quality and sheer quantity of comments, readers may be intimidated away and join more manageable discussions on other platforms. It is possible that a reader still wants a general understanding of the sentiment or reaction towards a particular piece, and this could provide an entry point into the conversation on the NYT site.
-
-## Hypothesis
-
-If we can extract highlights from the comments for a given article, we can present them as a summary of reaction towards a piece and the popular perspectives which are represented, quantifying the support for each. Readers can use this to orient themselves in the discussion around an article very quickly and immediately identify sub-conversations they can be a part of. This could increase engagement and time spent on the site.
-
-We can cluster the comments for a given article using an incremental hierarchical approach, which allows us to construct a cluster tree which can be persisted to disk or memory. With an incremental approach, new comments can be incorporated on a regular basis without needing to reconstruct the entire tree.
-
-In particular, we want to form comment groups which have:
-
-- similar semantic content
-- similar sentiment
-
-Under the assumption that we are likely to be clustering opinions towards some subject or subjects, the comments might be clustered on the following features:
-
-- sentiment
-- subjectivity metrics
-- text
-- article relevance
-- named entities or keywords
-
-Once the clusters are formed, there are two options:
-
-- From these clusters we can select a representative comment, which is the "best" of the group by some metric (e.g. most recommended, highest rated, or most relevant).
-- From these clusters we can select sentences or phrases which best represent the group.
-
-
-## Existing Implementations
+Here I propose an automated system for grouping similar comments and then identifying the best representative from each group. These selections can be used to identify the popular themes being discussed and construct a high-level summary of the discussion in the comments, which is useful to readers who may be interested in the general response towards a piece, but unwilling to wade through many comments. This summary can function as an alternate entry point to the comments if these highlights link back to their original comments.
 
 Yelp uses such a system to provide users with a high-level summary of the general opinion towards a service:
 
@@ -43,22 +13,58 @@ The YUMM project provides an implementation for a similar functionality, also on
 
 To my knowledge, no one has yet tried a similar technique on comments.
 
+## Motivation
+
+- About 20% of NYT commentable articles since 2014 have 100 or more comments. On popular or controversial stories, there may be hundreds to thousands of comments - of the entire comments dataset, about 2% (5015 articles) had at least 500 comments and 139 articles had over 2000 comments. In these cases it is unrealistic to assume that anyone will read even a significant fraction of the comments.
+- Even in more modest amounts, there may still be too many comments to read all the way through. On average, commentable articles have a mean of 60 comments. If we look at the ~52000 articles with at least 50 comments, the mean rises to 226.
+- Making sense of how people are reacting and what the general opinions are towards something is a very noisy and labor-intensive process. There is a great deal of repetition and redundancy and scattered points, so it is not necessarily time well spent.
+- Considering the varying quality and sheer quantity of comments, readers may be intimidated away and end up joining more manageable discussions on other platforms.
+- It is possible that a reader still wants a general understanding of the sentiment or reaction towards a particular piece, and Geiger could provide an entry point into the conversation on the NYT site.
+
+## Hypothesis
+
+If we can extract highlights from the comments for a given article, we can present them as a summary of reaction towards a piece and the popular perspectives which are represented, quantifying the support for each. Readers can use this to orient themselves in the discussion around an article very quickly and immediately identify sub-conversations they can be a part of. This could increase engagement and time spent on the site.
+
+Through identification of key aspects, we can group sentences by what they are talking _about_ and use this to surface general topics being discussed in the comments.
+
+Once the we form these "talking about" groups, there are two options:
+
+- We can select a representative sentence for each group, which is the "best" of the group by some metric (e.g. most recommended, highest rated, or most relevant).
+- We can present the top _n_ sentences from each group (ranked by some metric) to present a wider view of the points being made.
+
 ## Evaluation
 
-I have developed a web app which applies a variety of extraction strategies to the comments of any arbitrary NYT article and displays their outputs side-by-side. Using this frontend, we can develop some ground truth data with human annotators so we can automatically measure the performance of Geiger.
-
-Alternatively, we can use A/B testing and develop a ranking of which strategies are preferred, comparing against human-selected highlights. We could develop a Chrome extension which mocks these highlights into the NYT site to simulate the experience.
+- We could do internal A/B testing, comparing Geiger's groupings against human-selected groupings.
+- We could develop a Chrome extension which mocks these highlights into the NYT site to simulate the experience.
 
 ## Challenges
 
-- The main challenge is ensuring that comments which are making the same point, as judged by a human, is approximated by the automated clustering approach.
-- The second challenge is effectively selecting a sentence which is representative of the main point of each cluster.
+- The main challenge is accurately identifying the aspects people are talking about and displaying only the salient/interesting ones.
+- A secondary challenge is figuring out best to display these "talking about" groups - how many sentences should be shown from each?
 
 ## Current Status
 
-A very early prototype is available at [https://github.com/ftzeng/geiger](https://github.com/ftzeng/geiger).
+A functional prototype is available at [https://github.com/ftzeng/geiger](https://github.com/ftzeng/geiger).
 
-![Geiger prototype (4/14/2015)](proto.png)
+![Geiger prototype (4/24/2015)](proto.png)
+
+
+## Future Directions
+
+This system identifies comments which are discussing the same thing, but a useful, though technically challenging, extension would be to further group comments according to opinion or the point being made.
+
+In particular, we would want to form comment groups which have:
+
+- similar semantic content
+- similar sentiment
+
+The challenges here are that it is generally quite difficult to automatically group text according to semantics, especially with comments - such a task will be sensitive to the tricky aspects of language like sarcasm.
+
+A screenshot of initial explorations for this task is below:
+
+![Geiger prototype (4/14/2015)](proto2.png)
+
+This task might be made easier with a larger amount of training data. I've developed a web app for annotating training data which can be used to develop some ground truth data with human annotators, but it is a very time-consuming process.
 
 ## References
 
