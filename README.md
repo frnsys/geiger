@@ -62,20 +62,7 @@ If you are using the `polisent` featurizer, you must train the `polisent` model:
     $ python run.py train_polisent
 
 
-## Method
-
-The general approach is:
-
-- Identify comment clusters
-- For clusters satisfying some criteria (e.g. minimum size), select a representative sentence.
-
-
 ## Configuration
 
 The main configuration option is `config.features` in which you specify what featurizers to use.
 Clustering strategies other than LDA use these features to generate clusters.
-
-
-## To Do
-
-- write a chrome extension to mock the selections on a live NYT page
