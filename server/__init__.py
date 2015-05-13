@@ -1,34 +1,17 @@
-import os
 import json
-import config
-import geiger
-from geiger.text import strip_tags
+from geiger import services
 from geiger.comment import Comment
-from geiger import services, clustering
-from geiger.featurizers import Featurizer
-from geiger.baseline import extract_highlights
 from flask import Flask, render_template, request, jsonify
+from geiger.baseline import extract_highlights, select_highlights
+from geiger.semsim import SemSim, idf
+
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 
 
 @app.route('/')
 def index():
-    strats = [
-        'kmeans_extract_by_distance',
-        'hac_extract_by_distance',
-        'dbscan_extract_by_distance',
-        'lda_extract_by_distance',
-        'lda_extract_by_topics',
-        'aspects_only_pos',
-        'aspects_only_rake',
-        'aspects_only_apriori',
-        'sem_sim',
-        'extract_random'
-    ]
-
-    resolution = 'sentences' if config.sentences else 'comments'
-    return render_template('index.html', strategies=strats, featurizers=config.featurizers, resolution=resolution)
+    return render_template('index.html')
 
 
 @app.route('/talked-about', defaults={'url':''})
@@ -36,61 +19,11 @@ def index():
 def talked_about_preview(url):
     title, body, comments = _fetch_asset(url)
     highlights = extract_highlights(comments)
+    highlights = select_highlights(highlights, top_n=20)
     return render_template('talked_about.html', highlights=highlights)
 
 
-@app.route('/visualize/<strategy>/', defaults={'url':''})
-@app.route('/visualize/<strategy>/<path:url>')
-def visualize(strategy, url):
-    """
-    For more closely examining different clustering strategies.
-    """
-    title, body, comments = _fetch_asset(url)
-
-    strats = {
-        'lda': clustering.lda,
-        'hac': clustering.hac,
-        'k_means': clustering.k_means,
-        'dbscan': clustering.dbscan
-    }
-
-    if strategy not in strats:
-        return 'No clustering strategy by the name "{0}". Use one of {1}.'.format(strategy, list(strats.keys())), 404
-    else:
-        if strategy == 'lda':
-            clusters = strats[strategy](comments, return_ctx=True)
-        else:
-            f = Featurizer()
-            clusters = strats[strategy](comments, f, return_ctx=True)
-
-    return render_template('visualize.html', clusters=clusters, strategies=list(strats.keys()), strategy=strategy, featurizers=config.featurizers, url=url)
-
-
-@app.route('/annotate')
-def annotate():
-    """
-    For hand-annotating comments for a given article.
-    """
-    return render_template('annotate.html')
-
-
-@app.route('/api/annotate', methods=['POST'])
-def save_annotations():
-    """
-    Save the annotations from the frontend.
-    """
-    data = request.get_json()
-    fname = data['subject']['url'].replace('/', '_')
-
-    with open('data/annotations/{0}.json'.format(fname), 'w') as f:
-        json.dump(data, f)
-
-    return jsonify({
-        'success': True
-    })
-
-
-# Some simple API routes for an async frontend.
+# Some simple API routes for an async frontend
 @app.route('/api/comments', methods=['GET'])
 def get_comments():
     """
@@ -112,18 +45,11 @@ def get_comments():
     })
 
 
-from geiger.sentences import Sentence
-from nltk.tokenize import sent_tokenize
 @app.route('/api/geiger', methods=['POST'])
 def geigerize():
-    """
-    Selects highlights from submitted comments
-    using the specified strategy.
-    """
     data = request.get_json()
-    strat = data['strategy']
 
-    # Wrangle posted comments into the minimal format needed for processing.
+    # Wrangle posted comments into the minimal format needed for processing
     comments = [Comment({
         'commentID': c['id'],
         'commentBody': c['body_html'],
@@ -133,54 +59,29 @@ def geigerize():
         'replies': [] # ignoring replies for now
     }) for c in data['comments']]
 
-    results = []
-    if config.sentences:
-        # Try out sentences as the object
-        sentences = [[Sentence(sent, c) for sent in sent_tokenize(c.body)] for c in comments]
-        sentences = [s for sents in sentences for s in sents]
+    # Remove duplicates
+    bodies = list({c.body for c in comments})
 
-        # Run the specified strategy.
-        raw_results = getattr(geiger, strat)(sentences)
+    semsim = SemSim(debug=True)
+    clusters, descriptors, _ = semsim.cluster(bodies,
+                                              eps=[.55, .6 , .65, .7, .75, .8, .85, .9, .95])
 
-        # Format results into something jsonify-able.
-        for r in raw_results:
-            s = r[1]
-            results.append({
-                'sentence': r[0],
-                'comment': {
-                    'id': s.comment.id,
-                    'body': s.body,
-                    'author': s.comment.author
-                },
-                'support': int(r[2]),
-                'cohort': [c.body for c in r[3]]
-            })
 
-    else:
-        raw_results = getattr(geiger, strat)(comments)
+    # Get salient terms
+    all_terms = sorted(list(semsim.all_terms), key=lambda k: semsim.saliences[k], reverse=True)
+    salient_terms = [(kw, semsim.saliences[kw], idf.get(kw, 0), semsim.iidf.get(kw, 0)) for kw in all_terms]
 
-        # Format results into something jsonify-able.
-        for r in raw_results:
-            comment = r[1]
-            results.append({
-                'sentence': r[0],
-                'comment': {
-                    'id': comment.id,
-                    'body': comment.body,
-                    'author': comment.author
-                },
-                'support': int(r[2]),
-                'cohort': [c.body for c in r[3]]
-            })
-
-    return jsonify(results=results)
+    return jsonify(results={
+        'clusters': list(zip(clusters, descriptors)),
+        'terms': salient_terms
+    })
 
 
 @app.route('/api/talked-about', methods=['POST'])
 def talked_about():
     data = request.get_json()
 
-    # Wrangle posted comments into the minimal format needed for processing.
+    # Wrangle posted comments into the minimal format needed for processing
     comments = [Comment({
         'commentID': c['id'],
         'commentBody': c['body_html'],
@@ -190,9 +91,9 @@ def talked_about():
         'replies': [] # ignoring replies for now
     }) for c in data['comments']]
     highlights = extract_highlights(comments)
+    highlights = select_highlights(highlights)
 
-
-    # Format results into something jsonify-able.
+    # Format results into something jsonify-able
     results = []
     for r in highlights:
         sent, body = r[1]
@@ -209,56 +110,6 @@ def talked_about():
         })
 
     return jsonify(results=results)
-
-
-@app.route('/api/annotated_comments', methods=['GET'])
-def get_annotated_comments():
-    """
-    Gets asset data (title, body) and comments for a given NYT article url.
-    If annotated comments exist, load those.
-    """
-    url = request.args['url']
-
-    # Check if there are existing annotations.
-    fname = url.replace('/', '_')
-    path = 'data/annotations/{0}.json'.format(fname)
-    if os.path.exists(path):
-        with open(path, 'r') as f:
-            data = json.load(f)
-
-        # ugh should standardize this :\
-        # Format the data properly.
-        return jsonify({
-            'body': data['subject']['body'],
-            'title': data['subject']['title'],
-            'comments': list(data['comments'].values()),
-            'selections': data['selections']
-        })
-
-    # Otherwise, get the data.
-    title, body, comments = _fetch_asset(url)
-
-    # Precluster.
-    f = Featurizer()
-    clusters = clustering.k_means(comments, f)
-    for i, clus in enumerate(clusters):
-        for com in clus:
-            com.cluster = i
-
-    return jsonify({
-        'body': body,
-        'title': title,
-        'comments': [{
-            'id': c.id,
-            'body': c.body,
-            'body_html': c.body_html,
-            'author': c.author,
-            'score': c.score,
-            'cluster': c.cluster,
-            'notes': ''
-        } for c in comments],
-        'selections': [[] for i in clusters]
-    })
 
 
 def _fetch_asset(url):
@@ -287,20 +138,17 @@ def _fetch_asset(url):
         body = '(using example data)'
         title = 'Example Data'
 
-        class FauxComment():
-            def __init__(self, body, id):
-                self.id = id
-                self.body = strip_tags(body)
-                self.body_html = body
-                self.author = 'some author'
-                self.score = 0
-
-        path_to_examples = 'data/examples.json'
-        clusters = json.load(open(path_to_examples, 'r'))
-        docs = []
-        for clus in clusters:
-            for doc in clus:
-                docs.append(doc)
-        comments = [FauxComment(d, i) for i, d in enumerate(docs) if len(doc) > 140]
+        path_to_examples = 'data/examples/climate_example.json'
+        #path_to_examples = 'data/examples/clinton_example.json'
+        #path_to_examples = 'data/examples/gaymarriage_example.json'
+        data = json.load(open(path_to_examples, 'r'))
+        comments = [Comment({
+            'commentID': i,
+            'commentBody': d['body'],
+            'recommendations': d['score'],
+            'userDisplayName': '[the author]',
+            'createDate': '1431494183',
+            'replies': []
+        }) for i, d in enumerate(data) if len(d['body']) > 140]
 
     return title, body, comments

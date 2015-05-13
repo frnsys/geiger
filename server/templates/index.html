@@ -6,28 +6,22 @@
     <input type="text" class="url" placeholder="(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧ Enter a url to a NYT article w/ comments" />
 </header>
 
-<div class="subject">
-    <div class="loading">
-        <div class="loader"></div>
-        <h4>Loading article...</h4>
+<div class="tabbed">
+    <ul class="tabs">
+        <li class="active" data-tab="subject"><h1>Subject</h1></li>
+        <li data-tab="talked-about"><h1>Talked About</h1></li>
+        <li data-tab="geiger"><h1>Geiger</h1></li>
+    </ul>
+    <div class="subject active">
+        <div class="loading">
+            <div class="loader"></div>
+            <h4>Loading article...</h4>
+        </div>
+        <div class="error hide"></div>
+        <h1 class="subject--title"></h1>
+        <div class="subject--body"></div>
     </div>
-    <div class="error hide"></div>
-    <h1 class="subject--title"></h1>
-    <div class="subject--body"></div>
-</div>
-<div class="comments">
-    <div class="featurizers">
-        <h3>Active Featurizers</h3>
-        <ul>
-            {% for featurizer, params in featurizers.items() %}
-                <li>{{ featurizer }}</li>
-            {% endfor %}
-        </ul>
-        <p>Resolution: <b>{{ resolution }}</b></p>
-    </div>
-
-    <div class="talked-about">
-        <h1>Talked About</h1>
+    <div class="talked-about hide">
         <div class="loading">
             <div class="loader"></div>
             <h4>Loading "talked about"...</h4>
@@ -35,20 +29,18 @@
         <div class="error hide"></div>
         <ul class="thread"></ul>
     </div>
-
-    {% for strat in strategies %}
-        <div class="strategy hide" data-strategy="{{ strat }}">
-            <header>
-                <h2>{{ strat }}</h2>
-                <div class="controls">
-                    <button class="run" data-strategy="{{ strat }}">run</button>
-                    <div class="loader hide"></div>
-                    <div class="error hide"></div>
-                </div>
-            </header>
-            <ul class="thread"></ul>
+    <div class="geiger hide">
+        <div class="loading">
+            <div class="loader"></div>
+            <h4>Loading Geiger results...</h4>
         </div>
-    {% endfor %}
+        <div class="error hide"></div>
+        <div class="top-terms hide">
+            <h5>Most salient terms</h5>
+            <ul class="terms"></ul>
+        </div>
+        <ul class="thread"></ul>
+    </div>
 </div>
 
 
@@ -58,6 +50,14 @@
         <h6 class="support"><a href="#" class="author"><span>{1}</span></a> and <a href="#" class="commenters"><span>{2}</span> other commenters</a></h6>
         <div class="full-comment hide">{3}</div>
         <ul class="cohort hide">{4}</ul>
+    </li>
+</script>
+
+<script type="text/html" id="cluster_tmpl">
+    <li class="comment">
+        <ul class="cluster-terms terms">{0}</ul>
+        <h6 class="support"><a href="#" class="commenters"><span>{2}</span> comments</a></h6>
+        <ul class="cohort hide">{1}</ul>
     </li>
 </script>
 
@@ -82,7 +82,6 @@
                 url = url.split('?')[0]
                 $(this).val(url);
 
-                disable_geiger();
                 $('.subject--title, .subject--body').empty();
 
                 get_comments(url);
@@ -107,14 +106,14 @@
             $(this).find('.full-comment, .cohort').hide();
         });
 
-
-        // Run a single strategy.
-        $('.run').on('click', function() {
-            var strat = $(this).data('strategy');
-            geiger(strat);
-            $(this).hide();
-            $(this).siblings('.loader').show();
+        $('.tabs li').on('click', function() {
+            var tab = $(this).data('tab');
+            $('.tabs .active').removeClass('active');
+            $('.active').addClass('hide').removeClass('active');
+            $(this).addClass('active');
+            $('.'+tab).removeClass('hide').addClass('active');
         });
+
 
         // Load data for an NYT url.
         function get_comments(url) {
@@ -133,10 +132,10 @@
                     comments = data.comments;
                     $('.subject--title').text(data.title);
                     $('.subject--body').html(data.body);
-                    enable_geiger();
 
-                    // Load "talked about" right after
+                    // Load "talked about" and "geigerized" right after
                     get_talked_about();
+                    get_geigerized();
                 },
                 complete: function() {
                     $('.subject .loading').hide();
@@ -144,9 +143,20 @@
             });
         }
 
-        // Call a highlight strategy from the API.
-        function geiger(strat) {
-            var el = $('.strategy[data-strategy={0}]'.format(strat));
+        // Get Geiger results
+        function get_geigerized() {
+            var el = $('.geiger'),
+                thread = el.find('.thread'),
+                terms = el.find('.terms'),
+                top_terms = el.find('.top_terms');
+
+            el.find('.loading').show();
+            $('.tabs li[data-tab=geiger]')
+                .addClass('loading').removeClass('error');
+            thread.empty();
+            terms.empty();
+            top_terms.hide();
+
             $.ajax('/api/geiger', {
                 method: 'POST',
                 accepts: 'application/json',
@@ -154,50 +164,73 @@
                 dataType: 'json',
                 data: JSON.stringify({
                     comments: comments,
-                    strategy: strat
                 }),
                 error: function(xhr, status, err) {
                     el.find('.error').text(err).show();
+                    $('.tabs li[data-tab=geiger]').addClass('error');
                 },
                 success: function(data, status, xhr) {
-                    var data = data.results,
-                        thread = el.find('.thread');
-                    for (var i=0; i < data.length; i++) {
-                        var res = data[i],
-                            coh = '',
+                    var data = data.results;
+
+                    for (var i=0; i < data.clusters.length; i++) {
+                        var clus = data.clusters[i][0],
+                            desc = data.clusters[i][1],
+                            clus_html = '',
+                            desc_html = '',
                             hel;
 
-                        // List out the other sentences in this cohort.
-                        for (var j=0; j < res.cohort.length; j++) {
-                            coh += '<li>' + res.cohort[j] + '</li>';
+                        // List the top 10 terms describing this cluster
+                        var n_terms = desc.length > 10 ? 10 : desc.length;
+                        for (var j=0; j < n_terms; j++) {
+                            var term = desc[j][0],
+                                freq = desc[j][1],
+                                nsal = desc[j][2];
+                            desc_html += '<li style="background-color:' + color_for_percent(nsal) + ';">' + term + '</li>';
                         }
 
-                        // Build the highlight HTML.
-                        hel = $('#highlight_tmpl')
+                        // List out the other comments in this cluster with their terms
+                        for (var j=0; j < clus.length; j++) {
+                            var term_html = '';
+                            for (var k=0; k < clus[j][2].length; k++) {
+                                var term = clus[j][2][k][0],
+                                    freq = clus[j][2][k][1];
+                                    nsal = clus[j][2][k][2];
+                                term_html += '<li style="background-color:'+ color_for_percent(nsal) +';">' + term + ' x' + freq.toString() + '</li>';
+                            }
+                            clus_html += '<li>' + clus[j][1] + '<ul class="terms">' + term_html + '</ul></li>';
+                        }
+
+                        // Build the HTML.
+                        hel = $('#cluster_tmpl')
                                 .html()
-                                .format(res.sentence, res.comment.author, res.support, res.comment.body, coh);
+                                .format(desc_html, clus_html, clus.length);
 
                         thread.append(hel);
                     }
+
+                    // Render top salient terms
+                    for (var i=0; i < 20; i++) {
+                        terms.append('<li style="background-color:'+ color_for_percent(data.terms[i][1]) +';">'+data.terms[i][0]+'</li>');
+                    }
+
+                    top_terms.show();
                 },
                 complete: function() {
-                    el.find('.loader').hide();
+                    el.find('.loading').hide();
+                    $('.tabs li[data-tab=geiger]').removeClass('loading');
                 }
             });
         }
 
-        function enable_geiger() {
-            $('.strategy, .run').show();
-            $('.strategy .loader, .strategy .error').hide();
-        }
-        function disable_geiger() {
-            $('.strategy').hide();
-            $('.strategy .thread').empty();
-        }
-
         function get_talked_about() {
-            var el = $('.talked-about');
+            var el = $('.talked-about'),
+                thread = el.find('.thread');
+
             el.find('.loading').show();
+            $('.tabs li[data-tab=talked-about]')
+                .addClass('loading').removeClass('error');
+            thread.empty();
+
             $.ajax('/api/talked-about', {
                 method: 'POST',
                 accepts: 'application/json',
@@ -208,10 +241,10 @@
                 }),
                 error: function(xhr, status, err) {
                     el.find('.error').text(err).show();
+                    $('.tabs li[data-tab=talked-about]').addClass('error');
                 },
                 success: function(data, status, xhr) {
-                    var data = data.results,
-                        thread = el.find('.thread');
+                    var data = data.results;
                     for (var i=0; i < data.length; i++) {
                         var res = data[i],
                             coh = '',
@@ -232,9 +265,35 @@
                 },
                 complete: function() {
                     el.find('.loading').hide();
+                    $('.tabs li[data-tab=talked-about]').removeClass('loading');
                 }
             });
 
+        }
+
+        // Credit: <https://stackoverflow.com/a/7128796>
+        var percent_colors = [
+            { pct: 0.0, color: { r: 0x31, g: 0x70, b: 0x8F } },
+            { pct: 1.0, color: { r: 0x0A, g: 0xCA, b: 0x5C } } ];
+
+        var color_for_percent = function(pct) {
+            for (var i = 1; i < percent_colors.length - 1; i++) {
+                if (pct < percent_colors[i].pct) {
+                    break;
+                }
+            }
+            var lower = percent_colors[i - 1];
+            var upper = percent_colors[i];
+            var range = upper.pct - lower.pct;
+            var rangePct = (pct - lower.pct) / range;
+            var pctLower = 1 - rangePct;
+            var pctUpper = rangePct;
+            var color = {
+                r: Math.floor(lower.color.r * pctLower + upper.color.r * pctUpper),
+                g: Math.floor(lower.color.g * pctLower + upper.color.g * pctUpper),
+                b: Math.floor(lower.color.b * pctLower + upper.color.b * pctUpper)
+            };
+            return 'rgb(' + [color.r, color.g, color.b].join(',') + ')';
         }
     });
 </script>
