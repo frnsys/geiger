@@ -5,7 +5,7 @@ Francis Tseng
 
 ## Contextual IDFs
 
-Three contexts of IDF (inverse document frequency) for a term $t$, which are all normalized:
+We have two contexts of IDF (inverse document frequency) for a term $t$, which are all normalized:
 
 - $idf_g(t)$ - global IDF
 - $idf_i(t)$ - internal (intra-comment) IDF
