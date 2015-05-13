@@ -6,7 +6,7 @@ from geiger.text import strip_tags
 from geiger.comment import Comment
 from geiger import services, clustering
 from geiger.featurizers import Featurizer
-from geiger.baseline import extract_highlights
+from geiger.baseline import extract_highlights, select_highlights
 from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__, static_folder='static', static_url_path='')
@@ -36,6 +36,7 @@ def index():
 def talked_about_preview(url):
     title, body, comments = _fetch_asset(url)
     highlights = extract_highlights(comments)
+    highlights = select_highlights(highlights, top_n=20)
     return render_template('talked_about.html', highlights=highlights)
 
 
@@ -190,6 +191,7 @@ def talked_about():
         'replies': [] # ignoring replies for now
     }) for c in data['comments']]
     highlights = extract_highlights(comments)
+    highlights = select_highlights(highlights)
 
 
     # Format results into something jsonify-able.
@@ -288,19 +290,23 @@ def _fetch_asset(url):
         title = 'Example Data'
 
         class FauxComment():
-            def __init__(self, body, id):
+            def __init__(self, body, id, score):
                 self.id = id
                 self.body = strip_tags(body)
                 self.body_html = body
                 self.author = 'some author'
                 self.score = 0
 
-        path_to_examples = 'data/examples.json'
-        clusters = json.load(open(path_to_examples, 'r'))
-        docs = []
-        for clus in clusters:
-            for doc in clus:
-                docs.append(doc)
-        comments = [FauxComment(d, i) for i, d in enumerate(docs) if len(doc) > 140]
+        #path_to_examples = 'data/examples.json'
+        #clusters = json.load(open(path_to_examples, 'r'))
+        #docs = []
+        #for clus in clusters:
+            #for doc in clus:
+                #docs.append(doc)
+        #comments = [FauxComment(d, i) for i, d in enumerate(docs) if len(doc) > 140]
+
+        path_to_examples = 'data/examples/climate_example.json'
+        data = json.load(open(path_to_examples, 'r'))
+        comments = [FauxComment(d['body'], i, d['score']) for i, d in enumerate(data) if len(d['body']) > 140]
 
     return title, body, comments

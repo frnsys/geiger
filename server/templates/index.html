@@ -146,7 +146,10 @@
 
         // Call a highlight strategy from the API.
         function geiger(strat) {
-            var el = $('.strategy[data-strategy={0}]'.format(strat));
+            var el = $('.strategy[data-strategy={0}]'.format(strat)),
+                thread = el.find('.thread');
+
+            thread.empty();
             $.ajax('/api/geiger', {
                 method: 'POST',
                 accepts: 'application/json',
@@ -210,8 +213,7 @@
                     el.find('.error').text(err).show();
                 },
                 success: function(data, status, xhr) {
-                    var data = data.results,
-                        thread = el.find('.thread');
+                    var data = data.results;
                     for (var i=0; i < data.length; i++) {
                         var res = data[i],
                             coh = '',

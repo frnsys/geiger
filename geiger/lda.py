@@ -1,10 +1,10 @@
 import numpy as np
-from geiger.text import Vectorizer
+from geiger.text.vectorize import Vectorizer
 from gensim.matutils import Scipy2Corpus
 from gensim.models.ldamulticore import LdaMulticore
 
 
-class Model():
+class LDA():
     """
     LDA (Latent Dirichlet Allocation) model
     for unsupervised topic modeling.
@@ -80,3 +80,10 @@ class Model():
         vocab = self.vectr.vocabulary
         for topic in self.m.show_topics(num_topics=self.n_topics, num_words=10, formatted=False):
             print([vocab[int(ix)] for prob, ix in topic])
+
+    def topics_reprs(self):
+        vocab = self.vectr.vocabulary
+        reprs = []
+        for topic in self.m.show_topics(num_topics=self.n_topics, num_words=10, formatted=False):
+            reprs.append([(vocab[int(ix)], prob) for prob, ix in topic])
+        return reprs

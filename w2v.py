@@ -20,7 +20,12 @@ with Listener(address, authkey=b'password') as listener:
                 try:
                     msg = conn.recv()
                     try:
-                        conn.send(w2v.similarity(*msg))
+                        if msg[0] == 'vocab':
+                            conn.send(msg[1] in w2v.vocab)
+                        elif isinstance(msg[0], list):
+                            conn.send(w2v.n_similarity(*msg))
+                        else:
+                            conn.send(w2v.similarity(*msg))
                     except KeyError:
                         conn.send(0.)
                 except (EOFError, ConnectionResetError):
