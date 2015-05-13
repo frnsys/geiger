@@ -16,10 +16,10 @@ Download the necessary corpora:
 
     $ python -m textblob.download_corpora
 
-For the `baseline` ("talked about") strategy, the following must be trained:
+You will need to prepare some data:
 
-    $ python train_phrases.py
-    $ python train_idf.py
+    $ python prep.py train_phrases
+    $ python prep.py train_idf
 
 You can use any corpus to train these on; I used the body text of about 120k NYT articles and it has worked well. The more, the better, most likely.
 
@@ -27,42 +27,24 @@ These are used to better identify phrases in text and to have some notion of sal
 
 Run the server:
 
-    $ python run.py server
-
-You can evaluate the clustering algos with the currently selected featurizers on a (very) small labeled dataset:
-
-    $ python run.py eval
+    $ python server.py
 
 Then try out the demo:
 
     localhost:5001/
-
-This will output the selections from a variety of different strategies.
-
-To visualize the output of a clustering strategy (for debugging/tweaking purposes):
-
-    localhost:5001/visualize/[lda, hac, k_means, dbscan]
-    localhost:5001/visualize/[lda, hac, k_means, dbscan]/<NYT article url>
 
 To see the results of the baseline ("talked about") algorithm:
 
     localhost:5001/talked-about
     localhost:5001/talked-about/<NYT article url>
 
-### Other notes
 
-If you are using the `semsim` strategy, you will need to train a Word2Vec model and then run the `w2v.py` process:
+## Development
 
-    $ python w2v.py
+If you are developing and need to reload Geiger a lot, you are in for a bad time. The phrase and Word2Vec models take a very long time to load.
 
-The Word2Vec model is quite big and takes some time to load. The `w2v.py` script will run it as an independent process with a listener, which the `semsim` strategy interfaces with.
+Fortunately, things are setup so that you can run each of these in their own separate process, which don't need to be reloaded.
+If you set `remote=True` in `config.py`, the functions which rely on the phrase and Word2Vec models will call out to these
+separate processes instead of loading the models directly.
 
-If you are using the `polisent` featurizer, you must train the `polisent` model:
-
-    $ python run.py train_polisent
-
-
-## Configuration
-
-The main configuration option is `config.features` in which you specify what featurizers to use.
-Clustering strategies other than LDA use these features to generate clusters.
+The downside is that calling out to separate processes like this slows the usage of these models, but you'll likely be saving time overall.
