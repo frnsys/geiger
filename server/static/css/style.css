@@ -201,11 +201,19 @@ button {
     font-weight: normal;
 }
 .geiger .highlight-active {
-    color: #2671F5 !important;
+    /*color: #2671F5 !important;*/
+    color: #FF4949 !important;
 }
 .geiger .subdued,
 .geiger .subdued .highlight {
     color: #888;
+}
+.cohort, .geiger .highlight {
+    -webkit-transition: color 0.2s ease-in-out;
+    -ms-transition: color 0.2s ease-in-out;
+    -moz-transition: color 0.2s ease-in-out;
+    -o-transition: color 0.2s ease-in-out;
+    transition: color 0.2s ease-in-out;
 }
 
 /* Loader by Tobias Ahlin */
