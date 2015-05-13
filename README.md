@@ -2,7 +2,8 @@
 
 (work in progress - for details, see the [proposal](proposal/proposal.md).)
 
-## Usage
+
+## Setup
 
 Install requirements:
 
@@ -25,6 +26,9 @@ You can use any corpus to train these on; I used the body text of about 120k NYT
 
 These are used to better identify phrases in text and to have some notion of salience (inverse document frequency).
 
+
+## Usage
+
 Run the server:
 
     $ python server.py
@@ -43,9 +47,9 @@ To see the results of the baseline ("talked about") algorithm:
 
 If you are developing and need to reload Geiger a lot, you are in for a bad time. The phrase and Word2Vec models take a very long time to load.
 
-Fortunately, things are setup so that you can run each of these in their own separate process, which don't need to be reloaded.
+Fortunately, things are setup so that you can run each of these in their own separate processes, which don't need to be reloaded.
 If you set `remote=True` in `config.py`, the functions which rely on the phrase and Word2Vec models will call out to these
-separate processes instead of loading the models directly.
+separate processes instead of loading the models directly. Just make sure you set `remote=False` when deploying for production.
 
 Then you can run these processes separately like so:
 
