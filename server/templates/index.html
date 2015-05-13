@@ -35,8 +35,11 @@
             <h4>Loading Geiger results...</h4>
         </div>
         <div class="error hide"></div>
+        <div class="top-terms hide">
+            <h5>Most salient terms</h5>
+            <ul class="terms"></ul>
+        </div>
         <ul class="thread"></ul>
-        <ul class="terms"></ul>
     </div>
 </div>
 
@@ -52,7 +55,7 @@
 
 <script type="text/html" id="cluster_tmpl">
     <li class="comment">
-        <ul class="cluster_terms">{0}</ul>
+        <ul class="cluster-terms terms">{0}</ul>
         <h6 class="support"><a href="#" class="commenters"><span>{2}</span> comments</a></h6>
         <ul class="cohort hide">{1}</ul>
     </li>
@@ -144,13 +147,15 @@
         function get_geigerized() {
             var el = $('.geiger'),
                 thread = el.find('.thread'),
-                terms = el.find('.terms');
+                terms = el.find('.terms'),
+                top_terms = el.find('.top_terms');
 
             el.find('.loading').show();
             $('.tabs li[data-tab=geiger]')
                 .addClass('loading').removeClass('error');
             thread.empty();
             terms.empty();
+            top_terms.hide();
 
             $.ajax('/api/geiger', {
                 method: 'POST',
@@ -175,13 +180,24 @@
                             hel;
 
                         // List the top 10 terms describing this cluster
-                        for (var j=0; j < 10; j++) {
-                            desc_html += '<li>' + desc[j][0] + '</li>';
+                        var n_terms = desc.length > 10 ? 10 : desc.length;
+                        for (var j=0; j < n_terms; j++) {
+                            var term = desc[j][0],
+                                freq = desc[j][1],
+                                nsal = desc[j][2];
+                            desc_html += '<li style="background-color:' + color_for_percent(nsal) + ';">' + term + '</li>';
                         }
 
-                        // List out the other comments in this cluster
+                        // List out the other comments in this cluster with their terms
                         for (var j=0; j < clus.length; j++) {
-                            clus_html += '<li>' + clus[j][1] + '</li>';
+                            var term_html = '';
+                            for (var k=0; k < clus[j][2].length; k++) {
+                                var term = clus[j][2][k][0],
+                                    freq = clus[j][2][k][1];
+                                    nsal = clus[j][2][k][2];
+                                term_html += '<li style="background-color:'+ color_for_percent(nsal) +';">' + term + ' x' + freq.toString() + '</li>';
+                            }
+                            clus_html += '<li>' + clus[j][1] + '<ul class="terms">' + term_html + '</ul></li>';
                         }
 
                         // Build the HTML.
@@ -194,8 +210,10 @@
 
                     // Render top salient terms
                     for (var i=0; i < 20; i++) {
-                        terms.append('<li>'+data.terms[i][0]+'</li>');
+                        terms.append('<li style="background-color:'+ color_for_percent(data.terms[i][1]) +';">'+data.terms[i][0]+'</li>');
                     }
+
+                    top_terms.show();
                 },
                 complete: function() {
                     el.find('.loading').hide();
@@ -251,6 +269,31 @@
                 }
             });
 
+        }
+
+        // Credit: <https://stackoverflow.com/a/7128796>
+        var percent_colors = [
+            { pct: 0.0, color: { r: 0x31, g: 0x70, b: 0x8F } },
+            { pct: 1.0, color: { r: 0x0A, g: 0xCA, b: 0x5C } } ];
+
+        var color_for_percent = function(pct) {
+            for (var i = 1; i < percent_colors.length - 1; i++) {
+                if (pct < percent_colors[i].pct) {
+                    break;
+                }
+            }
+            var lower = percent_colors[i - 1];
+            var upper = percent_colors[i];
+            var range = upper.pct - lower.pct;
+            var rangePct = (pct - lower.pct) / range;
+            var pctLower = 1 - rangePct;
+            var pctUpper = rangePct;
+            var color = {
+                r: Math.floor(lower.color.r * pctLower + upper.color.r * pctUpper),
+                g: Math.floor(lower.color.g * pctLower + upper.color.g * pctUpper),
+                b: Math.floor(lower.color.b * pctLower + upper.color.b * pctUpper)
+            };
+            return 'rgb(' + [color.r, color.g, color.b].join(',') + ')';
         }
     });
 </script>

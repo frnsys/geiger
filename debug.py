@@ -48,8 +48,8 @@ if __name__ == '__main__':
             os.makedirs(clus_dir)
 
             kw_sets = []
-            for j, (idx, c) in enumerate(clus):
-                kw_sets.append(set(semmy.docs[idx]))
+            for j, (idx, c, kws) in enumerate(clus):
+                kw_sets.append(kws)
                 outfile = os.path.join(clus_dir, '{0}.txt'.format(j))
                 with open(outfile, 'w', encoding='utf-8') as f:
                     f.write('\n\n'.join([c,str(set(semmy.docs[idx]))]))
@@ -58,7 +58,7 @@ if __name__ == '__main__':
             for kws in kw_sets:
                 for kw in kws:
                     all_kw_counts[kw] += 1
-            ranked_kws = ['{0} [{1}]'.format(kw, all_kw_counts[kw] * semmy.saliences[kw]) for kw in sorted(all_kw_counts.keys(), key=lambda k: all_kw_counts[k], reverse=True)]
+            ranked_kws = ['{0} [{1}]'.format(kw, all_kw_counts[kw] * semmy.saliences[kw]) for kw, freq, nsal in sorted(all_kw_counts.keys(), key=lambda k: all_kw_counts[k], reverse=True)]
             outfile = os.path.join(clus_dir, '_keywords.txt')
             with open(outfile, 'w', encoding='utf-8') as f:
                 f.write('{0}\n-------------\n\n{1}'.format('\n'.join(ranked_kws[:10]), '\n'.join(ranked_kws[10:])))
@@ -70,8 +70,8 @@ if __name__ == '__main__':
         os.makedirs(clus_dir)
 
         kw_sets = []
-        for j, (idx, c) in enumerate(clus):
-            kw_sets.append(set(semmy.docs[idx]))
+        for j, (idx, c, kws) in enumerate(clus):
+            kw_sets.append(kws)
             outfile = os.path.join(clus_dir, '{0}.txt'.format(j))
             with open(outfile, 'w', encoding='utf-8') as f:
                 f.write('\n\n'.join([c,str(set(semmy.docs[idx]))]))
@@ -80,7 +80,7 @@ if __name__ == '__main__':
         for kws in kw_sets:
             for kw in kws:
                 all_kw_counts[kw] += 1
-        ranked_kws = ['{0} [{1}]'.format(kw, all_kw_counts[kw] * semmy.saliences[kw]) for kw in sorted(all_kw_counts.keys(), key=lambda k: all_kw_counts[k], reverse=True)]
+        ranked_kws = ['{0} [{1}]'.format(kw, all_kw_counts[kw] * semmy.saliences[kw]) for kw, freq, nsal in sorted(all_kw_counts.keys(), key=lambda k: all_kw_counts[k], reverse=True)]
         outfile = os.path.join(clus_dir, '_keywords.txt')
         with open(outfile, 'w', encoding='utf-8') as f:
             f.write('{0}\n-------------\n\n{1}'.format('\n'.join(ranked_kws[:10]), '\n'.join(ranked_kws[10:])))

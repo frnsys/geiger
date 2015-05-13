@@ -59,9 +59,12 @@ def geigerize():
         'replies': [] # ignoring replies for now
     }) for c in data['comments']]
 
+    # Remove duplicates
+    bodies = list({c.body for c in comments})
+
     semsim = SemSim(debug=True)
-    clusters, descriptors, _ = semsim.cluster([c.body for c in comments],
-                                               eps=[.55, .6 , .65, .7, .75, .8, .85, .9, .95])
+    clusters, descriptors, _ = semsim.cluster(bodies,
+                                              eps=[.55, .6 , .65, .7, .75, .8, .85, .9, .95])
 
 
     # Get salient terms
@@ -136,6 +139,8 @@ def _fetch_asset(url):
         title = 'Example Data'
 
         path_to_examples = 'data/examples/climate_example.json'
+        #path_to_examples = 'data/examples/clinton_example.json'
+        #path_to_examples = 'data/examples/gaymarriage_example.json'
         data = json.load(open(path_to_examples, 'r'))
         comments = [Comment({
             'commentID': i,

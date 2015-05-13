@@ -1,6 +1,6 @@
 import math
 import numpy as np
-from collections import defaultdict
+from collections import Counter, defaultdict
 from sklearn.cluster import DBSCAN
 from geiger.text.tokenize import extract_phrases, keyword_tokenize, gram_size
 from geiger.util.progress import Progress
@@ -280,6 +280,7 @@ class SemSim():
         return pruned
 
 
+    # TO DO clean this up
     def cluster(self, docs, eps):
         raw_docs = docs
 
@@ -326,6 +327,16 @@ class SemSim():
                 pass
 
 
+        # Represented docs in condensed form:
+        # [(term, freq), ...]
+
+        self.normalized_saliences = {}
+        mxm = max(self.saliences.values())
+        for k, v in self.saliences.items():
+            self.normalized_saliences[k] = v/mxm
+
+        condensed_docs = [[(t, f, self.normalized_saliences[t]) for t, f in list(Counter(d).items())] for d in self.docs]
+
         results = {}
         scores = {}
         for e in eps:
@@ -341,7 +352,9 @@ class SemSim():
                 clusters = [[] for _ in range(n)]
                 for i, doc in enumerate(self.docs):
                     if y[i] >= 0:
-                        clusters[y[i]].append((i, raw_docs[i]))
+                        clusters[y[i]].append((i,
+                                               raw_docs[i],
+                                               sorted(condensed_docs[i], key=lambda t: self.saliences[t[0]], reverse=True)))
 
                 results[e] = clusters
                 scores[e] = self._score_clusters(clusters, len(self.docs))
@@ -361,7 +374,9 @@ class SemSim():
                 clusters = [[] for _ in range(n)]
                 for i, doc in enumerate(self.docs):
                     if y[i] >= 0:
-                        clusters[y[i]].append((i, raw_docs[i]))
+                        clusters[y[i]].append((i,
+                                               raw_docs[i],
+                                               sorted(condensed_docs[i], key=lambda t: self.saliences[t[0]], reverse=True)))
 
             results[e] = clusters
             scores[e] = self._score_clusters(clusters, len(self.docs))
@@ -378,14 +393,14 @@ class SemSim():
         descriptors = []
         for i, clus in enumerate(the_clusters):
             kw_sets = []
-            for j, (idx, c) in enumerate(clus):
-                kw_sets.append(set(self.docs[idx]))
+            for j, (idx, c, kws) in enumerate(clus):
+                kw_sets.append(kws)
 
             all_kw_counts = defaultdict(int)
             for kws in kw_sets:
                 for kw in kws:
                     all_kw_counts[kw] += 1
-            ranked_kws = [(kw, all_kw_counts[kw] * self.saliences[kw]) for kw in sorted(all_kw_counts.keys(), key=lambda k: all_kw_counts[k], reverse=True)]
+            ranked_kws = [(kw, all_kw_counts[kw] * self.saliences[kw], nsal) for kw, freq, nsal in sorted(all_kw_counts.keys(), key=lambda k: all_kw_counts[k], reverse=True)]
             descriptors.append(ranked_kws)
         return the_clusters, descriptors, results
 

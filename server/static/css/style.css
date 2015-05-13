@@ -135,6 +135,26 @@ button {
 .comment:hover .context {
     display: block;
 }
+.terms {
+    padding: 0;
+}
+.terms li {
+    display: inline-block;
+    padding: 0.2em 0.4em;
+    background: #31708F;
+    color: #fff;
+    border-radius: 0.2em;
+    margin: 0.2em;
+}
+.top-terms {
+    margin-bottom: 4em;
+    padding-bottom: 2em;
+    border-bottom: 1px solid #B2DADA;
+}
+.cohort .terms {
+    font-size: 0.9em;
+}
+
 
 
 .tabs > li {
