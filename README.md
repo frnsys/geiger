@@ -47,4 +47,9 @@ Fortunately, things are setup so that you can run each of these in their own sep
 If you set `remote=True` in `config.py`, the functions which rely on the phrase and Word2Vec models will call out to these
 separate processes instead of loading the models directly.
 
+Then you can run these processes separately like so:
+
+    $ python dev.py word2vec
+    $ python dev.py phrases
+
 The downside is that calling out to separate processes like this slows the usage of these models, but you'll likely be saving time overall.
