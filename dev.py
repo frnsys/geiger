@@ -3,6 +3,8 @@ Run some slow-loading things as separate process
 that way they don't need to keep being reloaded.
 """
 
+import sys
+import json
 from multiprocessing.connection import Listener
 from gensim.models.word2vec import Word2Vec
 from gensim.models import Phrases
@@ -47,6 +49,30 @@ def phrases():
                     try:
                         msg = conn.recv()
                         conn.send(bigram[msg])
+                    except (EOFError, ConnectionResetError):
+                        break
+
+
+def idf():
+    print('Loading idf...')
+    idf = json.load(open('data/idf.json', 'r'))
+    mxm = max(idf.values())
+    for k, v in idf.items():
+        idf[k] = v/mxm
+
+    print('Creating listener...')
+    address = ('localhost', 6002)
+    with Listener(address, authkey=b'password') as listener:
+        while True:
+            with listener.accept() as conn:
+                print('connection accepted from {0}'.format(listener.last_accepted))
+                while True:
+                    try:
+                        msg = conn.recv()
+                        try:
+                            conn.send(idf[msg])
+                        except KeyError:
+                            conn.send(0.)
                     except (EOFError, ConnectionResetError):
                         break
 

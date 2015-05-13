@@ -25,7 +25,7 @@ if __name__ == '__main__':
 
     t0 = time()
     semmy = SemSim(debug=True)
-    results, all_clusters = semmy.cluster(docs, eps=[0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95])
+    all_clusters, descriptors, results = semmy.cluster(docs, eps=[0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95])
     elapsed = time() - t0
     print('------done in %.2fs------' % (elapsed))
 

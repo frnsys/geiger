@@ -1,15 +1,16 @@
 import re
-import json
+import config
 from collections import defaultdict
 from itertools import combinations, product
 from nltk.tokenize import sent_tokenize
 from nltk.stem.snowball import SnowballStemmer
+from geiger.knowledge import IDF
 from geiger.sentences import prefilter, Sentence
 from geiger.text.tokenize import keyword_tokenize, gram_size, lemma_forms
 
 
 stemmer = SnowballStemmer('english')
-idf = json.load(open('data/idf.json', 'r'))
+idf = IDF(remote=config.remote)
 
 
 def markup_highlights(term, doc):
@@ -30,17 +31,24 @@ def markup_highlights(term, doc):
         for t in forms:
             # This captures 'F.D.A' if given 'FDA'
             # yeah, it's kind of overkill
-            reg = '[.]?'.join(list(t))
+            reg_ = '[.]?'.join(list(t))
 
             # Spaces might be spaces, or they might be hyphens
-            reg = reg.replace(' ', '[\s-]')
+            reg_ = reg_.replace(' ', '[\s-]')
 
             # Only match the term if it is not continguous with other characters.
             # Otherwise it might be a substring of another word, which we want to
             # ignore
-            reg = '(^|{0})({1})($|{0})'.format('[^A-Za-z]', reg)
+            reg = '(^|{0})({1})($|{0})'.format('[^A-Za-z]', reg_)
 
-            doc = re.sub(reg, '\g<1><span class="highlight">\g<2></span>\g<3>', doc, flags=re.IGNORECASE)
+            if re.findall(reg, doc):
+                doc = re.sub(reg, '\g<1><span class="highlight">\g<2></span>\g<3>', doc, flags=re.IGNORECASE)
+            else:
+                # If none of the term was found, try with extra alpha characters
+                # This helps if a phrase was newly learned and only assembled in
+                # its lemma form, so we may be missing the actual form it appears in.
+                reg = '(^|{0})({1}[A-Za-z]?)()'.format('[^A-Za-z]', reg_)
+                doc = re.sub(reg, '\g<1><span class="highlight">\g<2></span>\g<3>', doc, flags=re.IGNORECASE)
 
     return doc
 

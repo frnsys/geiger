@@ -45,7 +45,7 @@ To see the results of the baseline ("talked about") algorithm:
 
 ## Development
 
-If you are developing and need to reload Geiger a lot, you are in for a bad time. The phrase and Word2Vec models take a very long time to load.
+If you are developing and need to reload Geiger a lot, you are in for a bad time. The phrase, IDF, and Word2Vec models take a very long time to load.
 
 Fortunately, things are setup so that you can run each of these in their own separate processes, which don't need to be reloaded.
 If you set `remote=True` in `config.py`, the functions which rely on the phrase and Word2Vec models will call out to these
@@ -55,5 +55,6 @@ Then you can run these processes separately like so:
 
     $ python dev.py word2vec
     $ python dev.py phrases
+    $ python dev.py idf
 
 The downside is that calling out to separate processes like this slows the usage of these models, but you'll likely be saving time overall.

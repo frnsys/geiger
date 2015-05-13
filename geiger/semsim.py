@@ -1,23 +1,15 @@
-import json
 import math
 import numpy as np
 from collections import defaultdict
 from sklearn.cluster import DBSCAN
 from geiger.text.tokenize import extract_phrases, keyword_tokenize, gram_size
 from geiger.util.progress import Progress
-from geiger.knowledge import W2V
+from geiger.knowledge import W2V, IDF
 
-
-# Load pre-trained global IDF and normalize
-print('Loading idf')
-idf = json.load(open('data/idf.json', 'r'))
-mxm = max(idf.values())
-for k, v in idf.items():
-    idf[k] = v/mxm
-print('done idf')
 
 import config
 w2v = W2V(remote=config.remote)
+idf = IDF(remote=config.remote)
 
 class SemSim():
     """
@@ -220,7 +212,6 @@ class SemSim():
         d1 = list(d1)
         d2 = list(d2)
 
-        # TO DO just filter out totally empty documents before this step
         if not d1 or not d2:
             return pairs
 
@@ -381,7 +372,22 @@ class SemSim():
             if scores[e] > 0.0:
                 the_clusters += [c for c in clusters if c not in the_clusters]
 
-        return results, the_clusters
+
+        # Build descriptors for each cluster
+        # TO DO clean this up
+        descriptors = []
+        for i, clus in enumerate(the_clusters):
+            kw_sets = []
+            for j, (idx, c) in enumerate(clus):
+                kw_sets.append(set(self.docs[idx]))
+
+            all_kw_counts = defaultdict(int)
+            for kws in kw_sets:
+                for kw in kws:
+                    all_kw_counts[kw] += 1
+            ranked_kws = [(kw, all_kw_counts[kw] * self.saliences[kw]) for kw in sorted(all_kw_counts.keys(), key=lambda k: all_kw_counts[k], reverse=True)]
+            descriptors.append(ranked_kws)
+        return the_clusters, descriptors, results
 
 
     def _score_clusters(self, clusters, n):

@@ -69,11 +69,6 @@ li {
     font-style: italic;
     font-size: 2em;
 }
-.subject, .comments {
-    max-width: 720px;
-    padding: 4em;
-    margin: 0 auto;
-}
 .subject {
     margin: 0 auto;
     line-height: 1.5;
@@ -84,32 +79,6 @@ li {
     text-align: center;
 }
 
-.featurizers {
-    padding: 0.5em 2em 1em 2em;
-    position: absolute;
-    left: 0;
-    border: 1px solid #f0f0f0;
-    margin: 0 0 0 1em;
-    background: #fafafa;
-}
-.featurizers ul {
-    padding: 0 0 0 1em;
-}
-
-.strategy {
-    margin: 0 0 6em 0;
-}
-.strategy header {
-    overflow: hidden;
-}
-.strategy h2 {
-    display: inline;
-    float: left;
-    margin: 0;
-}
-.controls {
-    float: right;
-}
 .hide {
     display: none;
 }
@@ -159,15 +128,50 @@ button {
     font-weight: bold;
     color: #EB1B23;
 }
-.talked-about {
-    padding: 4em 0 8em 0;
-}
 .context {
     color: #aaa;
     display: none;
 }
 .comment:hover .context {
     display: block;
+}
+
+
+.tabs > li {
+    vertical-align: top;
+    display: inline-block;
+    margin-right: 1.6em;
+    border-bottom: 4px solid transparent;
+    cursor: pointer;
+
+    color: #aaa;
+}
+.tabs > li:hover,
+.tabs > li.active {
+    color: #222;
+    border-bottom: 4px solid #222;
+}
+.tabs > li.loading:hover,
+.tabs > li.active.loading {
+    border-bottom: 4px solid #aaa;
+}
+.tabs > li.loading {
+  -webkit-animation: sk-pulseColor 1s infinite ease-in-out;
+          animation: sk-pulseColor 1s infinite ease-in-out;
+}
+.tabs {
+    margin: 0 0 4em 0;
+    padding: 0;
+    list-style-type: none;
+}
+.tabbed {
+    max-width: 720px;
+    padding: 4em;
+    margin: 0 auto;
+}
+.tabs h1 {
+    display: inline-block;
+    margin-bottom: 0;
 }
 
 /* Loader by Tobias Ahlin */
@@ -202,3 +206,15 @@ button {
     opacity: 0; } }
 
 
+
+@-webkit-keyframes sk-pulseColor {
+  0% { color: #aaa; }
+  50% { color: #888; }
+  100% { color: #aaa; }
+}
+
+@keyframes sk-pulseColor {
+  0% { color: #aaa; }
+  50% { color: #888; }
+  100% { color: #aaa; }
+}

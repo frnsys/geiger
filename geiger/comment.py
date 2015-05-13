@@ -1,5 +1,6 @@
 from datetime import datetime
-from geiger.text import strip_tags
+from geiger.text.clean import strip_tags
+
 
 class Comment():
     """
