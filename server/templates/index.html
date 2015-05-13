@@ -13,7 +13,7 @@
         <li data-tab="geiger"><h1>Geiger</h1></li>
     </ul>
     <div class="subject active">
-        <div class="loading">
+        <div class="loading hide">
             <div class="loader"></div>
             <h4>Loading article...</h4>
         </div>
@@ -22,7 +22,7 @@
         <div class="subject--body"></div>
     </div>
     <div class="talked-about hide">
-        <div class="loading">
+        <div class="loading hide">
             <div class="loader"></div>
             <h4>Loading "talked about"...</h4>
         </div>
@@ -30,7 +30,7 @@
         <ul class="thread"></ul>
     </div>
     <div class="geiger hide">
-        <div class="loading">
+        <div class="loading hide">
             <div class="loader"></div>
             <h4>Loading Geiger results...</h4>
         </div>
@@ -68,9 +68,6 @@
     $(function() {
         var comments;
 
-        // By default, just load example data.
-        get_comments($('input.url').val());
-
         // Submit an NYT article url to load.
         // This only works on the NYT internal network :(
         $('input.url').on('keypress', function(ev) {
@@ -104,6 +101,17 @@
 
         $('body').on('mouseleave', '.comment', function() {
             $(this).find('.full-comment, .cohort').hide();
+        });
+
+        // oof
+        $('body').on('mouseenter', '.geiger .comment .cohort .terms li', function() {
+            var term = $(this).data('term');
+            $(this).closest('.cohort').addClass('subdued');
+            $(this).closest('.cohort').find('.highlight[data-term="'+term+'"]').addClass('highlight-active');
+        });
+        $('body').on('mouseleave', '.geiger .comment .cohort .terms li', function() {
+            $('.highlight-active').removeClass('highlight-active');
+            $('.subdued').removeClass('subdued');
         });
 
         $('.tabs li').on('click', function() {
@@ -148,7 +156,7 @@
             var el = $('.geiger'),
                 thread = el.find('.thread'),
                 terms = el.find('.terms'),
-                top_terms = el.find('.top_terms');
+                top_terms = el.find('.top-terms');
 
             el.find('.loading').show();
             $('.tabs li[data-tab=geiger]')
@@ -191,13 +199,14 @@
                         // List out the other comments in this cluster with their terms
                         for (var j=0; j < clus.length; j++) {
                             var term_html = '';
-                            for (var k=0; k < clus[j][2].length; k++) {
-                                var term = clus[j][2][k][0],
-                                    freq = clus[j][2][k][1];
-                                    nsal = clus[j][2][k][2];
-                                term_html += '<li style="background-color:'+ color_for_percent(nsal) +';">' + term + ' x' + freq.toString() + '</li>';
+                                com_terms = clus[j][3];
+                            for (var k=0; k < com_terms.length; k++) {
+                                var term = com_terms[k][0],
+                                    freq = com_terms[k][1];
+                                    nsal = com_terms[k][2];
+                                term_html += '<li data-term="'+ term +'" style="background-color:'+ color_for_percent(nsal) +';">' + term + ' x' + freq.toString() + '</li>';
                             }
-                            clus_html += '<li>' + clus[j][1] + '<ul class="terms">' + term_html + '</ul></li>';
+                            clus_html += '<li>' + clus[j][2] + '<ul class="terms">' + term_html + '</ul></li>';
                         }
 
                         // Build the HTML.
@@ -213,7 +222,7 @@
                         terms.append('<li style="background-color:'+ color_for_percent(data.terms[i][1]) +';">'+data.terms[i][0]+'</li>');
                     }
 
-                    top_terms.show();
+                    top_terms.removeClass('hide').show();
                 },
                 complete: function() {
                     el.find('.loading').hide();

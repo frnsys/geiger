@@ -1,8 +1,9 @@
+import re
 import math
 import numpy as np
 from collections import Counter, defaultdict
 from sklearn.cluster import DBSCAN
-from geiger.text.tokenize import extract_phrases, keyword_tokenize, gram_size
+from geiger.text.tokenize import extract_phrases, keyword_tokenize, gram_size, lemma_forms
 from geiger.util.progress import Progress
 from geiger.knowledge import W2V, IDF
 
@@ -337,6 +338,14 @@ class SemSim():
 
         condensed_docs = [[(t, f, self.normalized_saliences[t]) for t, f in list(Counter(d).items())] for d in self.docs]
 
+
+        if self.debug:
+            print('highlighting docs....')
+        highlighted_docs = []
+        for i, doc in enumerate(raw_docs):
+            d = markup_highlights(doc, self.docs[i])
+            highlighted_docs.append(d)
+
         results = {}
         scores = {}
         for e in eps:
@@ -354,6 +363,7 @@ class SemSim():
                     if y[i] >= 0:
                         clusters[y[i]].append((i,
                                                raw_docs[i],
+                                               highlighted_docs[i],
                                                sorted(condensed_docs[i], key=lambda t: self.saliences[t[0]], reverse=True)))
 
                 results[e] = clusters
@@ -376,6 +386,7 @@ class SemSim():
                     if y[i] >= 0:
                         clusters[y[i]].append((i,
                                                raw_docs[i],
+                                               highlighted_docs[i],
                                                sorted(condensed_docs[i], key=lambda t: self.saliences[t[0]], reverse=True)))
 
             results[e] = clusters
@@ -393,7 +404,7 @@ class SemSim():
         descriptors = []
         for i, clus in enumerate(the_clusters):
             kw_sets = []
-            for j, (idx, c, kws) in enumerate(clus):
+            for j, (idx, c, hi, kws) in enumerate(clus):
                 kw_sets.append(kws)
 
             all_kw_counts = defaultdict(int)
@@ -429,3 +440,49 @@ class SemSim():
         avg_size = (sum(sizes)-max(sizes))/len(sizes)
 
         return coverage * math.sqrt(gravity * avg_size) * n_clusters
+
+
+def markup_highlights(raw_doc, term_doc):
+    """
+    Highlights each instance of the given term
+    in the document. All forms of the term will be highlighted.
+    """
+    doc = raw_doc
+    for t in set(term_doc):
+        for term in t.split(','):
+            term = term.strip()
+
+            # Determine which forms are present for the term in the document
+            if gram_size(term) == 1:
+                # Replace longer forms first so we don't replace their substrings.
+                forms = sorted(lemma_forms(term, doc), key=lambda f: len(f), reverse=True)
+            else:
+                forms = [term]
+
+            for t in forms:
+                # This captures 'F.D.A' if given 'FDA'
+                # yeah, it's kind of overkill
+                reg_ = '[.]?'.join(list(t))
+
+                # Spaces might be spaces, or they might be hyphens
+                reg_ = reg_.replace(' ', '[\s-]')
+
+                # Only match the term if it is not continguous with other characters.
+                # Otherwise it might be a substring of another word, which we want to
+                # ignore
+                # The last matching group is to try and ignore things which are
+                # in html tags.
+                reg = '(^|{0})({1})($|{0})(?!.?>)'.format('[^A-Za-z]', reg_)
+
+                if re.findall(reg, doc):
+                    doc = re.sub(reg, '\g<1><span class="highlight" data-term="{0}">\g<2></span>\g<3>'.format(term), doc, flags=re.IGNORECASE)
+                else:
+                    # If none of the term was found, try with extra alpha characters
+                    # This helps if a phrase was newly learned and only assembled in
+                    # its lemma form, so we may be missing the actual form it appears in.
+                    reg = '(^|{0})({1}[A-Za-z]?)()'.format('[^A-Za-z"]', reg_)
+                    doc = re.sub(reg, '\g<1><span class="highlight" data-term="{0}">\g<2></span>\g<3>'.format(term), doc, flags=re.IGNORECASE)
+
+    return doc
+
+

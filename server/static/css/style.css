@@ -99,7 +99,7 @@ button {
 }
 .cohort {
     padding: 1em 2em;
-    background: #fafafa;
+    background: #fcfcfc;
     border: 1px solid #E5E5E5;
 }
 .cohort li {
@@ -145,6 +145,7 @@ button {
     color: #fff;
     border-radius: 0.2em;
     margin: 0.2em;
+    cursor: pointer;
 }
 .top-terms {
     margin-bottom: 4em;
@@ -192,6 +193,19 @@ button {
 .tabs h1 {
     display: inline-block;
     margin-bottom: 0;
+}
+
+/* don't highlight geiger terms */
+.geiger .highlight {
+    color: #222;
+    font-weight: normal;
+}
+.geiger .highlight-active {
+    color: #2671F5 !important;
+}
+.geiger .subdued,
+.geiger .subdued .highlight {
+    color: #888;
 }
 
 /* Loader by Tobias Ahlin */

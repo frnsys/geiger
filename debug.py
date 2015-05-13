@@ -48,7 +48,7 @@ if __name__ == '__main__':
             os.makedirs(clus_dir)
 
             kw_sets = []
-            for j, (idx, c, kws) in enumerate(clus):
+            for j, (idx, c, hi, kws) in enumerate(clus):
                 kw_sets.append(kws)
                 outfile = os.path.join(clus_dir, '{0}.txt'.format(j))
                 with open(outfile, 'w', encoding='utf-8') as f:
@@ -70,7 +70,7 @@ if __name__ == '__main__':
         os.makedirs(clus_dir)
 
         kw_sets = []
-        for j, (idx, c, kws) in enumerate(clus):
+        for j, (idx, c, hi, kws) in enumerate(clus):
             kw_sets.append(kws)
             outfile = os.path.join(clus_dir, '{0}.txt'.format(j))
             with open(outfile, 'w', encoding='utf-8') as f:
