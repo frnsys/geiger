@@ -2,8 +2,9 @@ import json
 from geiger import services
 from geiger.comment import Comment
 from flask import Flask, render_template, request, jsonify
-from geiger.baseline import extract_highlights, select_highlights
+from geiger.aspects import extract_highlights, select_highlights
 from geiger.semsim import SemSim, idf
+from geiger.baseline import baseline
 
 
 app = Flask(__name__, static_folder='static', static_url_path='')
@@ -62,19 +63,59 @@ def geigerize():
     # Remove duplicates
     bodies = list({c.body for c in comments})
 
+    #from nltk import sent_tokenize
+    #from geiger.sentences import prefilter
+    #_sents = [sent_tokenize(b) for b in bodies]
+    #sents = []
+    #for sent_grp in _sents:
+        #sents += [s for s in sent_grp if prefilter(s)]
+
     semsim = SemSim(debug=True)
-    clusters, descriptors, _ = semsim.cluster(bodies,
-                                              eps=[.55, .6 , .65, .7, .75, .8, .85, .9, .95])
+    clusters, descriptors = semsim.cluster(bodies,
+    #clusters, descriptors = semsim.cluster(sents,
+                                           eps=[0.5, 0.6, 0.7, 0.8, 0.9,
+                                                1., 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8,
+                                                2., 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8])
 
 
     # Get salient terms
     all_terms = sorted(list(semsim.all_terms), key=lambda k: semsim.saliences[k], reverse=True)
     salient_terms = [(kw, semsim.saliences[kw], idf.get(kw, 0), semsim.iidf.get(kw, 0)) for kw in all_terms]
 
+    # Remove duplicates
+    descriptors = [list(set(desc)) for desc in descriptors]
+
     return jsonify(results={
         'clusters': list(zip(clusters, descriptors)),
-        'terms': salient_terms
+        'terms': salient_terms,
+        'gidf': {t: idf[t] for t in semsim.all_terms},
+        'lidf': semsim.iidf,
+        'saliences': {t: semsim.saliences[t] for t in semsim.all_terms}
     })
+
+
+@app.route('/api/baseline', methods=['POST'])
+def baseline_cluster():
+    data = request.get_json()
+
+    # Wrangle posted comments into the minimal format needed for processing
+    comments = [Comment({
+        'commentID': c['id'],
+        'commentBody': c['body_html'],
+        'recommendations': c['score'],
+        'userDisplayName': c['author'],
+        'createDate': 0,
+        'replies': [] # ignoring replies for now
+    }) for c in data['comments']]
+
+    # Remove duplicates
+    bodies = list({c.body for c in comments})
+
+    clusters = baseline(bodies,
+                        eps=[1., 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8,
+                             2., 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8])
+
+    return jsonify(results=clusters)
 
 
 @app.route('/api/talked-about', methods=['POST'])

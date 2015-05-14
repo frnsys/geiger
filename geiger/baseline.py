@@ -1,185 +1,97 @@
-import re
-import config
-from collections import defaultdict
-from itertools import combinations, product
-from nltk.tokenize import sent_tokenize
-from nltk.stem.snowball import SnowballStemmer
-from geiger.knowledge import IDF
-from geiger.sentences import prefilter, Sentence
-from geiger.text.tokenize import keyword_tokenize, gram_size, lemma_forms
+import string
+from scipy.spatial.distance import pdist, squareform
+from sklearn.feature_extraction.text import TfidfTransformer, CountVectorizer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import Normalizer
+from nltk.tokenize import word_tokenize
+from nltk.stem.wordnet import WordNetLemmatizer
+from nltk.corpus import stopwords
+from geiger.clusters import cluster
 
 
-stemmer = SnowballStemmer('english')
-idf = IDF(remote=config.remote)
+def baseline(docs, eps=[0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95], metric='euclidean'):
+    dist_mat = _compute_dist_mat(docs, metric)
+    clusters = cluster(dist_mat, eps)
+    return [[docs[i] for i in clus] for clus in clusters]
 
 
-def markup_highlights(term, doc):
-    """
-    Highlights each instance of the given term
-    in the document. All forms of the term will be highlighted.
-    """
-    for term in term.split(','):
-        term = term.strip()
+def _compute_dist_mat(docs, metric):
+    v = Vectorizer()
+    vecs = v.vectorize(docs, train=True)
+    dist_mat = pdist(vecs.todense(), metric=metric)
+    return squareform(dist_mat)
 
-        # Determine which forms are present for the term in the document
-        if gram_size(term) == 1:
-            # Replace longer forms first so we don't replace their substrings.
-            forms = sorted(lemma_forms(term, doc), key=lambda f: len(f), reverse=True)
+
+class Vectorizer():
+    def __init__(self, min_df=0.015, max_df=0.9):
+        """
+        `min_df` is set to filter out extremely rare words,
+        since we don't want those to dominate the distance metric.
+
+        `max_df` is set to filter out extremely common words,
+        since they don't convey much information.
+        """
+
+        args = [
+            ('vectorizer', CountVectorizer(input='content', stop_words='english', lowercase=True, tokenizer=Tokenizer(), min_df=min_df, max_df=max_df)),
+            ('tfidf', TfidfTransformer(norm=None, use_idf=True, smooth_idf=True)),
+            ('normalizer', Normalizer(copy=False))
+        ]
+
+        self.pipeline = Pipeline(args)
+
+    def vectorize(self, docs, train=False):
+        if train:
+            return self.pipeline.fit_transform(docs)
         else:
-            forms = [term]
+            return self.pipeline.transform(docs)
 
-        for t in forms:
-            # This captures 'F.D.A' if given 'FDA'
-            # yeah, it's kind of overkill
-            reg_ = '[.]?'.join(list(t))
-
-            # Spaces might be spaces, or they might be hyphens
-            reg_ = reg_.replace(' ', '[\s-]')
-
-            # Only match the term if it is not continguous with other characters.
-            # Otherwise it might be a substring of another word, which we want to
-            # ignore
-            reg = '(^|{0})({1})($|{0})'.format('[^A-Za-z]', reg_)
-
-            if re.findall(reg, doc):
-                doc = re.sub(reg, '\g<1><span class="highlight">\g<2></span>\g<3>', doc, flags=re.IGNORECASE)
-            else:
-                # If none of the term was found, try with extra alpha characters
-                # This helps if a phrase was newly learned and only assembled in
-                # its lemma form, so we may be missing the actual form it appears in.
-                reg = '(^|{0})({1}[A-Za-z]?)()'.format('[^A-Za-z]', reg_)
-                doc = re.sub(reg, '\g<1><span class="highlight">\g<2></span>\g<3>', doc, flags=re.IGNORECASE)
-
-    return doc
+    @property
+    def vocabulary(self):
+        return self.pipeline.named_steps['vectorizer'].get_feature_names()
 
 
-def extract_sentences(comments):
+class Tokenizer():
     """
-    Return qualifying sentences from a list of comments.
+    Custom tokenizer for vectorization.
+    Uses Lemmatization.
     """
-    # Get sentences, filtered fairly aggressively
-    sents = [[Sentence(sent, c) for sent in sent_tokenize(c.body) if prefilter(sent)] for c in comments]
+    def __init__(self):
+        self.lemmr = WordNetLemmatizer()
+        self.stops = stopwords.words('english')
+        self.punct = {ord(p): ' ' for p in string.punctuation + '“”'}
 
-    # Flatten
-    return [sent for s in sents for sent in s]
+        # Treat periods specially, replacing them with nothing.
+        # This is so that initialisms like F.D.A. get preserved as FDA.
+        self.period = {ord('.'): None}
 
+    def __call__(self, doc):
+        return self.tokenize(doc)
 
-def extract_highlights(comments):
-    sents = extract_sentences(comments)
-    print('{0} sentences...'.format(len(sents)))
+    def tokenize(self, doc):
+        """
+        Tokenizes a document, using a lemmatizer.
 
-    # Tokenize sentences,
-    # group sentences by their aspects.
-    # Keep track of keywords and keyphrases
-    keywords = set()
-    keyphrases = set()
-    aspect_map = defaultdict(set)
-    for sent in sents:
-        tokens = set(keyword_tokenize(sent.body))
-        for t in tokens:
-            aspect_map[t].add(sent)
-            if gram_size(t) > 1:
-                keyphrases.add(t)
-            else:
-                keywords.add(t)
+        Args:
+            | doc (str)                 -- the text document to process.
 
-    # Try to identify novel phrases by looking at
-    # keywords which co-occur some percentage of the time.
-    # This could probably be more efficient/cleaned up
-    for (kw, sents), (kw_, sents_) in combinations(aspect_map.items(), 2):
-        intersect = sents.intersection(sents_)
+        Returns:
+            | list                      -- the list of tokens.
+        """
 
-        # Require a min. intersection
-        if len(intersect) <= 3:
-            continue
+        tokens = []
 
-        # Look for phrases that are space-delimited or joined by 'and' or '-'
-        ph_reg = '({0}|{1})(\s|-)(and\s)?({0}|{1})'.format(kw, kw_)
+        # Strip punctuation.
+        doc = doc.translate(self.period)
+        doc = doc.translate(self.punct)
 
-        # Extract candidate phrases and keep track of their counts
-        phrases = defaultdict(int)
-        mega_sent = ' '.join(sent.body.lower() for sent in intersect)
-        for m in re.findall(ph_reg, mega_sent):
-            phrases[''.join(m)] += 1
-
-        if not phrases:
-            continue
-
-        # Get the phrase encountered the most
-        top_phrase = max(phrases.keys(), key=lambda k: phrases[k])
-        top_count = phrases[top_phrase]
-
-        if top_count/len(intersect) >= 0.8:
-            # Check if this new phrase is contained by an existing keyphrase.
-            if any(top_phrase in ph for ph in keyphrases):
+        for token in word_tokenize(doc):
+            # Ignore punctuation and stopwords
+            if token in self.stops:
                 continue
-            aspect_map[top_phrase] = intersect
-            keyphrases.add(top_phrase)
 
+            # Lemmatize
+            lemma = self.lemmr.lemmatize(token.lower())
+            tokens.append(lemma)
 
-    # Prune aspects
-    # If a keyword is encountered as part of a keyphrase, remove overlapping
-    # sentences with the keyphrase from the keyword's sentences.
-    for kw, kp in ((kw, kp) for kw, kp in product(keywords, keyphrases) if kw in kp):
-        aspect_map[kw] = aspect_map[kw].difference(aspect_map[kp])
-
-    # Group terms with common stems
-    stem_map = defaultdict(list)
-    for kw in keywords:
-        stem = stemmer.stem(kw)
-        stem_map[stem].append(kw)
-
-    # Group sentences with common aspect stems.
-    for stem, kws in stem_map.items():
-        if len(kws) == 1:
-            continue
-
-        key = ', '.join(kws)
-        aspect_map[key] = set()
-        for kw in kws:
-            aspect_map[key] = aspect_map[key].union(aspect_map[kw])
-
-            # Remove the old keys
-            aspect_map.pop(kw, None)
-
-    return aspect_map
-
-
-def select_highlights(aspect_map, top_n=10):
-    """
-    Rank aspects by support/interestingness
-    and return the top n.
-
-    Highlights are returned as:
-
-        [(keyword/keyphrase, representative sentence, cohort sentences), ...]
-
-    """
-    highlights = []
-    for k in sorted(aspect_map, key=score(aspect_map), reverse=True)[:top_n]:
-        aspect_sents = sorted(aspect_map[k], key=lambda s: s.comment.score, reverse=True)
-        if not aspect_sents:
-            continue
-        aspect_sents = [(sent, markup_highlights(k, sent.body)) for sent in aspect_sents]
-        highlights.append((k, aspect_sents[0], aspect_sents[1:]))
-
-    return highlights
-
-
-def score(aspect_map, min_sup=5):
-    """
-    Emphasize phrases and salient keys (as valued by idf).
-    """
-    def _score(k):
-        support = len(aspect_map[k])
-
-        # Require some minimum support.
-        if support < min_sup:
-            return 0
-
-        scores = []
-        for k_ in k.split(', '):
-            # Mean IDF was ~15.2, so slightly bias unencountered terms.
-            scores.append(idf.get(k_, 15.5)**2 * support * gram_size(k_))
-        return sum(scores)/len(scores)
-    return _score
+        return tokens

@@ -25,43 +25,9 @@ if __name__ == '__main__':
 
     t0 = time()
     semmy = SemSim(debug=True)
-    all_clusters, descriptors, results = semmy.cluster(docs, eps=[0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95])
+    all_clusters, descriptors = semmy.cluster(docs, eps=[0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95])
     elapsed = time() - t0
     print('------done in %.2fs------' % (elapsed))
-
-    for e, clusters in results.items():
-        print('-------------------------------------------------')
-        print('dbscan with eps={0}'.format(e))
-        print('num clusters:')
-        print(len(clusters))
-        print('num comments:')
-        print(sum([len(clus) for clus in clusters]))
-        print('cluster sizes:')
-        print([len(clus) for clus in clusters])
-        print('cluster score:')
-        print(semmy._score_clusters(clusters, len(docs)))
-
-        eps_dir = os.path.join(outdir, 'eps_{0}'.format(e))
-        os.makedirs(eps_dir)
-        for i, clus in enumerate(clusters):
-            clus_dir = os.path.join(eps_dir, 'clus_{0}'.format(i))
-            os.makedirs(clus_dir)
-
-            kw_sets = []
-            for j, (idx, c, hi, kws) in enumerate(clus):
-                kw_sets.append(kws)
-                outfile = os.path.join(clus_dir, '{0}.txt'.format(j))
-                with open(outfile, 'w', encoding='utf-8') as f:
-                    f.write('\n\n'.join([c,str(set(semmy.docs[idx]))]))
-
-            all_kw_counts = defaultdict(int)
-            for kws in kw_sets:
-                for kw in kws:
-                    all_kw_counts[kw] += 1
-            ranked_kws = ['{0} [{1}]'.format(kw, all_kw_counts[kw] * semmy.saliences[kw]) for kw, freq, nsal in sorted(all_kw_counts.keys(), key=lambda k: all_kw_counts[k], reverse=True)]
-            outfile = os.path.join(clus_dir, '_keywords.txt')
-            with open(outfile, 'w', encoding='utf-8') as f:
-                f.write('{0}\n-------------\n\n{1}'.format('\n'.join(ranked_kws[:10]), '\n'.join(ranked_kws[10:])))
 
     all_clusters_dir = os.path.join(outdir, '_all_clusters')
     os.makedirs(all_clusters_dir)

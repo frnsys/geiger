@@ -11,6 +11,7 @@
         <li class="active" data-tab="subject"><h1>Subject</h1></li>
         <li data-tab="talked-about"><h1>Talked About</h1></li>
         <li data-tab="geiger"><h1>Geiger</h1></li>
+        <li data-tab="baseline"><h1>Baseline</h1></li>
     </ul>
     <div class="subject active">
         <div class="loading hide">
@@ -41,6 +42,14 @@
         </div>
         <ul class="thread"></ul>
     </div>
+    <div class="baseline hide">
+        <div class="loading hide">
+            <div class="loader"></div>
+            <h4>Loading baseline results...</h4>
+        </div>
+        <div class="error hide"></div>
+        <ul class="thread"></ul>
+    </div>
 </div>
 
 
@@ -56,6 +65,14 @@
 <script type="text/html" id="cluster_tmpl">
     <li class="comment">
         <ul class="cluster-terms terms">{0}</ul>
+        <h6 class="support"><a href="#" class="commenters"><span>{2}</span> comments</a></h6>
+        <ul class="cohort hide">{1}</ul>
+    </li>
+</script>
+
+<script type="text/html" id="baseline_tmpl">
+    <li class="comment">
+        <p>{0}</p>
         <h6 class="support"><a href="#" class="commenters"><span>{2}</span> comments</a></h6>
         <ul class="cohort hide">{1}</ul>
     </li>
@@ -82,6 +99,7 @@
                 $('.subject--title, .subject--body').empty();
 
                 get_comments(url);
+                $('[data-tab=subject]').click();
             }
         });
 
@@ -114,6 +132,18 @@
             $('.subdued').removeClass('subdued');
         });
 
+        // IDF tooltips
+        $('body').on('mouseenter', '.term', function() {
+            var gidf = $(this).data('gidf'),
+                lidf = $(this).data('lidf'),
+                salience = $(this).data('salience');
+
+            $(this).append('<div class="idf-tooltip">Global idf: '+gidf.toFixed(3)+'<br />Local idf: '+lidf.toFixed(3)+'<br />Salience: '+salience.toFixed(3)+'</div>');
+        });
+        $('body').on('mouseleave', '.term', function() {
+            $(this).find('.idf-tooltip').remove();
+        });
+
         $('.tabs li').on('click', function() {
             var tab = $(this).data('tab');
             $('.tabs .active').removeClass('active');
@@ -141,8 +171,9 @@
                     $('.subject--title').text(data.title);
                     $('.subject--body').html(data.body);
 
-                    // Load "talked about" and "geigerized" right after
+                    // Load "talked about", "baseline", and "geigerized" right after
                     get_talked_about();
+                    get_baseline();
                     get_geigerized();
                 },
                 complete: function() {
@@ -193,7 +224,9 @@
                             var term = desc[j][0],
                                 freq = desc[j][1],
                                 nsal = desc[j][2];
-                            desc_html += '<li style="background-color:' + color_for_percent(nsal) + ';">' + term + '</li>';
+                            desc_html += '<li style="background-color:' + color_for_percent(nsal) +
+                                         ';" class="term" data-gidf="' + data.gidf[term] + '" data-lidf="' + data.lidf[term] + '" data-salience="' + data.saliences[term] + '">' +
+                                         term + '</li>';
                         }
 
                         // List out the other comments in this cluster with their terms
@@ -204,7 +237,9 @@
                                 var term = com_terms[k][0],
                                     freq = com_terms[k][1];
                                     nsal = com_terms[k][2];
-                                term_html += '<li data-term="'+ term +'" style="background-color:'+ color_for_percent(nsal) +';">' + term + ' x' + freq.toString() + '</li>';
+                                term_html += '<li data-term="'+ term +'" style="background-color:'+ color_for_percent(nsal) +
+                                    ';" class="term" data-gidf="' + data.gidf[term] + '" data-lidf="' + data.lidf[term] + '" data-salience="' + data.saliences[term] + '">' +
+                                    term + ' x' + freq.toString() + '</li>';
                             }
                             clus_html += '<li>' + clus[j][2] + '<ul class="terms">' + term_html + '</ul></li>';
                         }
@@ -219,7 +254,10 @@
 
                     // Render top salient terms
                     for (var i=0; i < 20; i++) {
-                        terms.append('<li style="background-color:'+ color_for_percent(data.terms[i][1]) +';">'+data.terms[i][0]+'</li>');
+                        var term = data.terms[i][0];
+                        terms.append('<li style="background-color:'+ color_for_percent(data.terms[i][1]) +
+                                ';" class="term" data-gidf="' + data.gidf[term] + '" data-lidf="' + data.lidf[term] + '" data-salience="' + data.saliences[term] + '">' +
+                                term+'</li>');
                     }
 
                     top_terms.removeClass('hide').show();
@@ -279,6 +317,57 @@
             });
 
         }
+
+        function get_baseline() {
+            var el = $('.baseline'),
+                thread = el.find('.thread');
+
+            el.find('.loading').show();
+            $('.tabs li[data-tab=baseline]')
+                .addClass('loading').removeClass('error');
+            thread.empty();
+
+            $.ajax('/api/baseline', {
+                method: 'POST',
+                accepts: 'application/json',
+                contentType: 'application/json',
+                dataType: 'json',
+                data: JSON.stringify({
+                    comments: comments
+                }),
+                error: function(xhr, status, err) {
+                    el.find('.error').text(err).show();
+                    $('.tabs li[data-tab=baseline]').addClass('error');
+                },
+                success: function(data, status, xhr) {
+                    var data = data.results;
+                    for (var i=0; i < data.length; i++) {
+                        var clus = data[i],
+                            coh = '',
+                            hel;
+
+                        // List out the other sentences in this cohort.
+                        for (var j=1; j < clus.length; j++) {
+                            coh += '<li>' + clus[j] + '</li>';
+                        }
+
+                        // Build the HTML.
+                        hel = $('#baseline_tmpl')
+                                .html()
+                                .format(clus[0], coh, clus.length);
+
+                        thread.append('{0}'.format(hel));
+                    }
+                },
+                complete: function() {
+                    el.find('.loading').hide();
+                    $('.tabs li[data-tab=baseline]').removeClass('loading');
+                }
+            });
+
+        }
+
+
 
         // Credit: <https://stackoverflow.com/a/7128796>
         var percent_colors = [

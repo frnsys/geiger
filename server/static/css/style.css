@@ -55,7 +55,7 @@ li {
     font-family: "nyt-franklin",arial,helvetica,sans-serif;
 }
 .error {
-    color: #FC0D1B;
+    color: #FC0D1B !important;
 }
 .success {
     color: #4FC3A0;
@@ -204,6 +204,9 @@ button {
     /*color: #2671F5 !important;*/
     color: #FF4949 !important;
 }
+.geiger .highlight-active .highlight {
+    color: #FF4949 !important;
+}
 .geiger .subdued,
 .geiger .subdued .highlight {
     color: #888;
@@ -214,6 +217,21 @@ button {
     -moz-transition: color 0.2s ease-in-out;
     -o-transition: color 0.2s ease-in-out;
     transition: color 0.2s ease-in-out;
+}
+
+.term {
+    position: relative;
+}
+.term .idf-tooltip {
+    position: absolute;
+    right: -3em;
+    bottom: -5em;
+    background: #eaeaea;
+    border: 1px solid #aaa;
+    color: #222;
+    padding: 0.5em;
+    width: 8em;
+    z-index: 10;
 }
 
 /* Loader by Tobias Ahlin */

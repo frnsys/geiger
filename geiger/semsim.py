@@ -2,15 +2,15 @@ import re
 import math
 import numpy as np
 from collections import Counter, defaultdict
-from sklearn.cluster import DBSCAN
 from geiger.text.tokenize import extract_phrases, keyword_tokenize, gram_size, lemma_forms
 from geiger.util.progress import Progress
 from geiger.knowledge import W2V, IDF
-
+from geiger.clusters import cluster
 
 import config
 w2v = W2V(remote=config.remote)
 idf = IDF(remote=config.remote)
+
 
 class SemSim():
     """
@@ -19,10 +19,8 @@ class SemSim():
     A "term" is a keyword or a keyphrase.
     """
 
-    def __init__(self, ideal_idf=0.7, penalty=0.3, debug=False):
+    def __init__(self, debug=False):
         self.debug = debug
-        self.ideal_idf = ideal_idf
-        self.penalty = penalty
 
 
     def _tokenize(self, raw_docs):
@@ -281,15 +279,14 @@ class SemSim():
         return pruned
 
 
-    # TO DO clean this up
-    def cluster(self, docs, eps):
-        raw_docs = docs
+    def _preprocess(self, docs):
+        self.raw_docs = docs
 
         if self.debug:
-            print('clustering {0} docs'.format(len(raw_docs)))
+            print('clustering {0} docs'.format(len(self.raw_docs)))
 
         # Represent docs as list of terms
-        self.docs = self._tokenize(raw_docs)
+        self.docs = self._tokenize(self.raw_docs)
 
         # Compute intra-comment IDF and salience for all terms
         self.iidf = self._internal_idf(self.docs)
@@ -302,6 +299,11 @@ class SemSim():
         self.docs = self._prune(self.docs)
         self.all_terms = {t for terms in self.docs for t in terms}
 
+        if self.debug:
+            print('vocabulary has {0} terms'.format(len(self.all_terms)))
+
+
+    def _distance_matrix(self):
         # Cache a w2v sim mat for faster lookup
         n = len(self.all_terms)
         self.w2v_sim_mat = np.full((n, n), -1)
@@ -309,13 +311,19 @@ class SemSim():
         # Map terms to their indices in the w2v sim mat
         self.w2v_term_map = {t: i for i, t in enumerate(self.all_terms)}
 
-        if self.debug:
-            print('vocabulary has {0} terms'.format(n))
-
         # Compute similarity matrix and convert to a distance matrix
         sim_mat = self._similarity_matrix(self.docs)
-        dist_mat = np.ones(sim_mat.shape) - sim_mat
+        sim_mat[np.where(sim_mat == 0)] = 0.000001
+        dist_mat = 1/sim_mat - 1
         self.sim_mat = sim_mat
+
+        return dist_mat
+
+
+    # TO DO clean this up
+    def cluster(self, docs, eps):
+        self._preprocess(docs)
+        dist_mat = self._distance_matrix()
 
         if self.debug:
             try:
@@ -341,68 +349,25 @@ class SemSim():
 
         if self.debug:
             print('highlighting docs....')
+
         highlighted_docs = []
-        for i, doc in enumerate(raw_docs):
+        for i, doc in enumerate(self.raw_docs):
             d = markup_highlights(doc, self.docs[i])
             highlighted_docs.append(d)
 
-        results = {}
-        scores = {}
-        for e in eps:
-            m = DBSCAN(metric='precomputed', eps=e, min_samples=3)
-            y = m.fit_predict(dist_mat)
-
-            n = max(y) + 1
-
-            if n == 0:
-                print('NO CLUSTERS')
-
-            else:
-                clusters = [[] for _ in range(n)]
-                for i, doc in enumerate(self.docs):
-                    if y[i] >= 0:
-                        clusters[y[i]].append((i,
-                                               raw_docs[i],
-                                               highlighted_docs[i],
-                                               sorted(condensed_docs[i], key=lambda t: self.saliences[t[0]], reverse=True)))
-
-                results[e] = clusters
-                scores[e] = self._score_clusters(clusters, len(self.docs))
-
-        best_eps = max(scores, key=lambda k: scores[k])
-
-        for e in np.arange(best_eps - 0.1, best_eps + 0.1, 0.025):
-            m = DBSCAN(metric='precomputed', eps=e, min_samples=2)
-            y = m.fit_predict(dist_mat)
-
-            n = max(y) + 1
-
-            if n == 0:
-                print('NO CLUSTERS')
-
-            else:
-                clusters = [[] for _ in range(n)]
-                for i, doc in enumerate(self.docs):
-                    if y[i] >= 0:
-                        clusters[y[i]].append((i,
-                                               raw_docs[i],
-                                               highlighted_docs[i],
-                                               sorted(condensed_docs[i], key=lambda t: self.saliences[t[0]], reverse=True)))
-
-            results[e] = clusters
-            scores[e] = self._score_clusters(clusters, len(self.docs))
-
-        # Merge clustering results
-        the_clusters = []
-        for e, clusters in results.items():
-            if scores[e] > 0.0:
-                the_clusters += [c for c in clusters if c not in the_clusters]
-
+        clusters = cluster(dist_mat, eps, min_samples=3)
+        if clusters:
+            clusters = [[(
+                i,
+                self.raw_docs[i],
+                highlighted_docs[i],
+                sorted(condensed_docs[i], key=lambda t: self.saliences[t[0]], reverse=True)
+            ) for i in clus] for clus in clusters]
 
         # Build descriptors for each cluster
         # TO DO clean this up
         descriptors = []
-        for i, clus in enumerate(the_clusters):
+        for i, clus in enumerate(clusters):
             kw_sets = []
             for j, (idx, c, hi, kws) in enumerate(clus):
                 kw_sets.append(kws)
@@ -413,33 +378,8 @@ class SemSim():
                     all_kw_counts[kw] += 1
             ranked_kws = [(kw, all_kw_counts[kw] * self.saliences[kw], nsal) for kw, freq, nsal in sorted(all_kw_counts.keys(), key=lambda k: all_kw_counts[k], reverse=True)]
             descriptors.append(ranked_kws)
-        return the_clusters, descriptors, results
+        return clusters, descriptors
 
-
-    def _score_clusters(self, clusters, n):
-        """
-        Want to favor more evenly distributed clusters
-        which cover a greater amount of the total documents.
-
-        E.g.
-            - not [300]
-            - not [298, 2]
-            - not [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
-            - more like [20, 14, 18, 21, 8]
-        """
-        n_clusters = len(clusters)
-        sizes = [len(c) for c in clusters]
-
-        # How many comments are represented by the clusters
-        coverage = sum(sizes)/n
-
-        # How much coverage is accounted for by a single cluster
-        gravity = math.log(sum(sizes)/max(sizes))
-
-        # Avg discounting the largest cluster
-        avg_size = (sum(sizes)-max(sizes))/len(sizes)
-
-        return coverage * math.sqrt(gravity * avg_size) * n_clusters
 
 
 def markup_highlights(raw_doc, term_doc):
@@ -448,7 +388,9 @@ def markup_highlights(raw_doc, term_doc):
     in the document. All forms of the term will be highlighted.
     """
     doc = raw_doc
-    for t in set(term_doc):
+    term_doc = set(term_doc)
+    term_doc = sorted(list(term_doc), key=lambda t: len(t), reverse=True) # Longest first
+    for t in term_doc:
         for term in t.split(','):
             term = term.strip()
 
@@ -472,7 +414,7 @@ def markup_highlights(raw_doc, term_doc):
                 # ignore
                 # The last matching group is to try and ignore things which are
                 # in html tags.
-                reg = '(^|{0})({1})($|{0})(?!.?>)'.format('[^A-Za-z]', reg_)
+                reg = '(^|{0})({1})($|{0})(?=[^>]*(<|$))'.format('[^A-Za-z]', reg_)
 
                 if re.findall(reg, doc):
                     doc = re.sub(reg, '\g<1><span class="highlight" data-term="{0}">\g<2></span>\g<3>'.format(term), doc, flags=re.IGNORECASE)
@@ -480,9 +422,7 @@ def markup_highlights(raw_doc, term_doc):
                     # If none of the term was found, try with extra alpha characters
                     # This helps if a phrase was newly learned and only assembled in
                     # its lemma form, so we may be missing the actual form it appears in.
-                    reg = '(^|{0})({1}[A-Za-z]?)()'.format('[^A-Za-z"]', reg_)
+                    reg = '(^|{0})({1}[A-Za-z]?)()(?=[^>]*(<|$))'.format('[^A-Za-z]', reg_)
                     doc = re.sub(reg, '\g<1><span class="highlight" data-term="{0}">\g<2></span>\g<3>'.format(term), doc, flags=re.IGNORECASE)
 
     return doc
-
-
