@@ -74,8 +74,9 @@ def geigerize():
     clusters, descriptors = semsim.cluster(bodies,
     #clusters, descriptors = semsim.cluster(sents,
                                            eps=[0.5, 0.6, 0.7, 0.8, 0.9,
-                                                1., 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8,
-                                                2., 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8])
+                                                1., 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9,
+                                                2., 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9,
+                                                3., 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9])
 
 
     # Get salient terms
@@ -112,8 +113,9 @@ def baseline_cluster():
     bodies = list({c.body for c in comments})
 
     clusters = baseline(bodies,
-                        eps=[1., 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8,
-                             2., 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8])
+                        eps=[1., 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9,
+                             2., 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9,
+                             3., 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9])
 
     return jsonify(results=clusters)
 
@@ -179,8 +181,8 @@ def _fetch_asset(url):
         body = '(using example data)'
         title = 'Example Data'
 
-        path_to_examples = 'data/examples/climate_example.json'
-        #path_to_examples = 'data/examples/clinton_example.json'
+        #path_to_examples = 'data/examples/climate_example.json'
+        path_to_examples = 'data/examples/clinton_example.json'
         #path_to_examples = 'data/examples/gaymarriage_example.json'
         data = json.load(open(path_to_examples, 'r'))
         comments = [Comment({

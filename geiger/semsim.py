@@ -19,8 +19,9 @@ class SemSim():
     A "term" is a keyword or a keyphrase.
     """
 
-    def __init__(self, debug=False):
+    def __init__(self, debug=False, min_salience=0.55):
         self.debug = debug
+        self.min_salience = min_salience
 
 
     def _tokenize(self, raw_docs):
@@ -271,7 +272,7 @@ class SemSim():
 
         pruned = []
         for doc in docs:
-            pruned.append([t for t in doc if self.saliences[t] >= 0.5 and self.iidf[t] < 1.0 and t not in redundant])
+            pruned.append([t for t in doc if self.saliences[t] >= self.min_salience and self.iidf[t] < 1.0 and t not in redundant])
         return pruned
 
 
@@ -366,13 +367,13 @@ class SemSim():
         for i, clus in enumerate(clusters):
             kw_sets = []
             for j, (idx, c, hi, kws) in enumerate(clus):
-                kw_sets.append(kws)
+                kw_sets.append(set(kws))
 
             all_kw_counts = defaultdict(int)
             for kws in kw_sets:
                 for kw in kws:
                     all_kw_counts[kw] += 1
-            ranked_kws = [(kw, all_kw_counts[kw] * self.saliences[kw], nsal) for kw, freq, nsal in sorted(all_kw_counts.keys(), key=lambda k: all_kw_counts[k], reverse=True)]
+            ranked_kws = [(kw, all_kw_counts[kw] * self.saliences[kw], nsal) for kw, freq, nsal in sorted(all_kw_counts.keys(), key=lambda k: all_kw_counts[k] * self.saliences[k[0]], reverse=True)]
             descriptors.append(ranked_kws)
         return clusters, descriptors
 

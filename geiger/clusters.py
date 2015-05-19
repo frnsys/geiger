@@ -1,6 +1,8 @@
 import math
 import numpy as np
+from collections import defaultdict
 from sklearn.cluster import DBSCAN
+from sklearn.metrics import silhouette_score
 
 
 def cluster(dist_mat, eps, min_samples=3, redundant_cutoff=0.8):
@@ -12,6 +14,16 @@ def cluster(dist_mat, eps, min_samples=3, redundant_cutoff=0.8):
     scores = {}
     for e in eps:
         clusters, labels = _cluster(dist_mat, e, min_samples)
+
+        # Num of clusters has to be at least 2 for the silhouette score to be
+        # calculated
+        if len(set(labels)) > 1:
+            print('number of non-noise clusters: {0}'.format(len(set(labels)) - 1))
+            #print('silhouette score of eps {0}'.format(e))
+            #print(silhouette_score(dist_mat, labels, metric='precomputed'))
+            print('dunn score')
+            print(dunn(dist_mat, labels))
+            print('------------------------------------------------------')
         if clusters:
             agg_clusters[e] = clusters
             scores[e] = score_clusters(clusters, dist_mat.shape[0])
@@ -51,14 +63,15 @@ def _merge(clusters, redundant_cutoff=0.8):
             # Compute Jaccard scores
             s = len(c_i.intersection(c_j)) / len(c_i.union(c_j))
             if s >= redundant_cutoff:
-                overlapping.append(c_j)
+                overlapping.append((c_j, s))
 
         # If no overlapping clusters, we're done with this cluster
         if not overlapping:
             processed.append(c_i)
 
-        # Otherwise, merge the clusters as a new candidate
+        # Otherwise, merge the most similar clusters as a new candidate
         else:
+            c_j = max(overlapping, key=lambda x: x[1])[0]
             candidates.remove(c_j)
             candidates.append(c_i.union(c_j))
 
@@ -111,3 +124,59 @@ def score_clusters(clusters, n):
     avg_size = (sum(sizes)-max(sizes))/len(sizes)
 
     return coverage * math.sqrt(gravity * avg_size) * n_clusters
+
+
+
+def dunn(dist_mat, labels):
+    """
+    See: <https://en.wikipedia.org/wiki/Cluster_analysis#External_evaluation>
+    """
+    # Map indices to labels
+    cluster_indices = defaultdict(list)
+    for i, label in enumerate(labels):
+        cluster_indices[label].append(i)
+
+    # Remove noise
+    del cluster_indices[-1]
+
+    if len(cluster_indices) <= 1:
+        return 0.
+
+    # Intra-cluster distance is the max distance b/w members
+    intra_cds = []
+    for indices in cluster_indices.values():
+        sub_mat = _clus_mat(dist_mat, indices)
+        intra_cds.append( np.max(sub_mat) )
+
+    # Find the largest intra-cluster distance
+    max_intra_cd = max(intra_cds)
+
+    # Inter-cluster distance is the min distance b/w members
+    inter_cds = []
+    for indices1 in cluster_indices.values():
+        for indices2 in cluster_indices.values():
+            if indices1 == indices2:
+                continue
+            sub_mat = _inter_clus_mat(dist_mat, indices1, indices2)
+            inter_cds.append( np.min(sub_mat) )
+
+    # Find the smallest inter-cluster distance
+    min_inter_cd = min(inter_cds)
+
+    return min_inter_cd/max_intra_cd
+
+
+def _clus_mat(dist_mat, indices):
+    """
+    Returns a submatrix representing the internal distance matrix for a cluster.
+    """
+    rows, cols = zip(*[([i], i) for i in indices])
+    return dist_mat[rows, cols]
+
+def _inter_clus_mat(dist_mat, indices1, indices2):
+    """
+    Returns a submatrix presenting the distance matrix between two clusters' members.
+    """
+    rows = [[i] for i in indices1]
+    cols = indices2
+    return dist_mat[rows, cols]

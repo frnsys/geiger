@@ -36,7 +36,8 @@ def keyword_tokenize(doc):
 
     # Extract keyphrases
     phrases = [ph.replace('_', ' ') for ph in bigram[blo.words]]
-    phrases = [ph for ph in blo.noun_phrases + phrases if gram_size(ph) > 1]
+    phrases = [ph for ph in phrases if gram_size(ph) > 1]
+    phrases += [ph for ph in blo.noun_phrases if gram_size(ph) > 1 and ph not in phrases]
 
     toks = []
     for tok, tag in blo.tags:
@@ -45,6 +46,7 @@ def keyword_tokenize(doc):
             if wn_tag is not None:
                 toks.append(lem.lemmatize(tok, wn_tag))
     toks += phrases
+
     return toks
 
 
