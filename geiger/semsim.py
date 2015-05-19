@@ -31,10 +31,6 @@ class SemSim():
         docs = [[t for t in keyword_tokenize(d) if gram_size(t) <= 3] for d in raw_docs]
         docs, keyphrases = extract_phrases(docs, raw_docs)
 
-        if self.debug:
-            print('found {0} keyphrases:'.format(len(keyphrases)))
-            print(keyphrases)
-
         return docs
 
 

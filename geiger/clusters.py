@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.cluster import DBSCAN
 
 
-def cluster(dist_mat, eps, min_samples=3):
+def cluster(dist_mat, eps, min_samples=3, redundant_cutoff=0.8):
     # Mean nearest distances
     mean_nd = np.mean(np.apply_along_axis(lambda a: np.min(a[np.nonzero(a)]), 1, dist_mat))
     print('mean nearest distance: {0}'.format(mean_nd))
@@ -31,7 +31,42 @@ def cluster(dist_mat, eps, min_samples=3):
         if scores[e] > 0.0:
             final_clusters += [c for c in clusters if c not in final_clusters]
 
+    # Merge redundant clusters
+    final_clusters = _merge(final_clusters, redundant_cutoff=redundant_cutoff)
+
     return final_clusters
+
+
+def _merge(clusters, redundant_cutoff=0.8):
+    candidates = [set(clus) for clus in clusters]
+    processed = []
+
+    while len(candidates) > 1:
+        overlapping = []
+
+        c_i = candidates.pop()
+
+        # Compare candidate against other candidates
+        for c_j in candidates:
+            # Compute Jaccard scores
+            s = len(c_i.intersection(c_j)) / len(c_i.union(c_j))
+            if s >= redundant_cutoff:
+                overlapping.append(c_j)
+
+        # If no overlapping clusters, we're done with this cluster
+        if not overlapping:
+            processed.append(c_i)
+
+        # Otherwise, merge the clusters as a new candidate
+        else:
+            candidates.remove(c_j)
+            candidates.append(c_i.union(c_j))
+
+    # Add the left over candidate, if any
+    processed += candidates
+
+    # Return as lists again
+    return [list(clus) for clus in processed]
 
 
 def _cluster(dist_mat, eps, min_samples):
