@@ -1,14 +1,17 @@
+import os
 import sys
 import json
 import math
 from glob import glob
-from collections import defaultdict
+from itertools import chain, islice
+from collections import Counter, defaultdict
 from gensim.models import Phrases
 from nltk.tokenize import word_tokenize, sent_tokenize
 from geiger.services import get_comments
 from geiger.util.progress import Progress
 from geiger.text.clean import strip_punct
 from geiger.text.tokenize import keyword_tokenize
+from geiger.util.parallel import parallelize
 
 
 def train_phrases(paths=['data/asset_bodies.txt']):
@@ -44,28 +47,64 @@ def train_phrases(paths=['data/asset_bodies.txt']):
 
 def train_idf(paths=['data/asset_bodies.txt']):
     """
-    Train a IDF model on a list of files.
+    Train a IDF model on a list of files (parallelized).
     """
-    n = 0
     for path in paths:
-        print('Counting lines for {0}...'.format(path))
-        n += sum(1 for line in open(path, 'r'))
-    print('Processing {0} lines...'.format(n))
+        args = [(file,) for file in _split_file(path, chunk_size=5000)]
 
-    idf = defaultdict(int)
-    N = 0
+    results = parallelize(_count_idf, args)
+    idfs, n_docs = zip(*results)
 
-    for tokens in _idf_doc_stream(paths, n):
-        N += 1
-        for token in tokens:
-            idf[token] += 1
-
+    print('Merging...')
+    idf = _merge(idfs)
+    N = sum(n_docs)
 
     for k, v in idf.items():
         idf[k] = math.log(N/v)
 
     with open('data/idf.json', 'w') as f:
         json.dump(idf, f)
+
+
+def _count_idf(path):
+    """
+    Count term frequencies and documents for a single file.
+    """
+    N = 0
+    idf = defaultdict(int)
+    for tokens in _idf_doc_stream(path):
+        N += 1
+        # Don't count freq, just presence
+        for token in set(tokens):
+            idf[token] += 1
+    return idf, N
+
+
+def train_tf(paths=['data/asset_bodies.txt']):
+    """
+    Train a map of term frequencies on a list of files (parallelized).
+    """
+    for path in paths:
+        args = [(file,) for file in _split_file(path, chunk_size=5000)]
+
+    results = parallelize(_count_tf, args)
+
+    print('Merging...')
+    tf = _merge(results)
+
+    with open('data/tf.json', 'w') as f:
+        json.dump(tf, f)
+
+
+def _count_tf(path):
+    """
+    Count term frequencies for a single file.
+    """
+    tf = defaultdict(int)
+    for tokens in _tf_doc_stream(path):
+        for token in tokens:
+            tf[token] += 1
+    return tf
 
 
 def get_comments(url):
@@ -105,40 +144,57 @@ def _phrase_doc_stream(paths, n):
                     yield tokens
 
 
-def _idf_doc_stream(paths, n):
+def _idf_doc_stream(path):
     """
-    Generator to feed sentences to IDF model.
+    Generator to feed sentences to IDF trainer.
     """
-    i = 0
-    p = Progress()
-    for path in paths:
-        with open(path, 'r') as f:
-            for line in f:
-                i += 1
-                p.print_progress(i/n)
-                for sent in sent_tokenize(line):
-                    yield keyword_tokenize(sent)
+    with open(path, 'r') as f:
+        for line in f:
+            yield keyword_tokenize(line)
+            #for sent in sent_tokenize(line):
+                #yield keyword_tokenize(sent)
 
 
+def _tf_doc_stream(path):
+    """
+    Generator to feed sentences to TF trainer.
+    """
+    with open(path, 'r') as f:
+        for line in f:
+            #yield keyword_tokenize(line)
+            yield word_tokenize(line.lower())
 
-# Use the following if you split up (parallelize) your IDF computing.
-# You have to manually specify N in this case.
-def _merge_idfs(N):
-    data = glob('data/idf/idf_*.json')
-    idfs = [json.load(open(d, 'r')) for d in data]
-    return merge(idfs)
 
 def _merge(dicts):
-    i = 0
-    n = sum([len(d.keys()) for d in dicts])
-    p = Progress()
-    merged = defaultdict(int)
-    for d in dicts:
-        for k in d:
-            i += 1
-            p.print_progress(i/n)
-            merged[k] += d[k]
-    return merged
+    """
+    Merges a list of dicts, summing their values.
+    """
+    merged = sum([Counter(d) for d in dicts], Counter())
+    return dict(merged)
+
+
+def _chunks(iterable, n):
+    """
+    Splits an iterable into chunks of size n.
+    """
+    iterable = iter(iterable)
+    while True:
+        # store one line in memory,
+        # chain it to an iterator on the rest of the chunk
+        yield chain([next(iterable)], islice(iterable, n-1))
+
+
+def _split_file(path, chunk_size=50000):
+    """
+    Splits the specified file into smaller files.
+    """
+    with open(path) as f:
+        for i, lines in enumerate(_chunks(f, chunk_size)):
+            file_split = '{}.{}'.format(os.path.basename(path), i)
+            chunk_path = os.path.join('/tmp', file_split)
+            with open(chunk_path, 'w') as f:
+                f.writelines(lines)
+            yield chunk_path
 
 
 if __name__ == '__main__':
