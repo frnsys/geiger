@@ -80,6 +80,12 @@ def extract_phrases(docs, raw_docs):
 
     Docs should be input in tokenized (`docs`) and untokenized (`raw_docs`) form.
     """
+    # Gather existing keyphrases
+    keyphrases = set()
+    for doc in docs:
+        for t in doc:
+            if gram_size(t) > 1:
+                keyphrases.add(t)
 
     # Count document co-occurrences
     t_counts = defaultdict(int)
@@ -98,7 +104,6 @@ def extract_phrases(docs, raw_docs):
     # Identify novel phrases by looking at
     # keywords which co-occur some percentage of the time.
     # This could probably be more efficient/cleaned up
-    keyphrases = set()
     for (kw, kw_), count in t_counts.items():
         # Look for phrases that are space-delimited or joined by 'and' or '-'
         ph_reg = re.compile('({0}|{1})(\s|-)(and\s)?({0}|{1})'.format(kw, kw_))
