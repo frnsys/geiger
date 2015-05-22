@@ -45,7 +45,6 @@ def cluster(dist_mat, eps, min_samples=3, redundant_cutoff=0.8):
 
     # Merge redundant clusters
     final_clusters = _merge(final_clusters, redundant_cutoff=redundant_cutoff)
-
     return final_clusters
 
 

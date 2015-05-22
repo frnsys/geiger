@@ -12,6 +12,64 @@ w2v = W2V(remote=config.remote)
 idf = IDF(remote=config.remote)
 
 
+class Doc():
+    def __init__(self, id, raw, terms):
+        self.id = id
+        self.raw = raw
+        self.terms = sorted(terms, key=lambda t: t.salience, reverse=True)
+        self.term_freqs = {t: f for t, f in list(Counter(self.terms).items())}
+
+        # Keep track of max-sim pairs against each other document
+        # (for debugging)
+        self.pairs = {}
+
+    def __iter__(self):
+        return iter(self.terms)
+
+    def __contains__(self, term):
+        return term in self.terms
+
+    def __getitem__(self, i):
+        return self.terms[i]
+
+    def count(self, term):
+        return self.raw.count(term.term)
+
+    def to_json(self):
+        return {
+            'id': self.id,
+            'raw': self.raw,
+            'terms': [t.to_json() for t in self.terms],
+            'terms_uniq': [t.to_json() for t in set(self.terms)],
+            'term_freqs': {t.term: f for t, f in self.term_freqs.items()},
+            'pairs': {d.id: [(t1.term, t2.term, sim) for t1, t2, sim in pairs] for d, pairs in self.pairs.items()},
+            'highlighted': getattr(self, 'highlighted', None)
+        }
+
+
+class Term():
+    def __init__(self, term, salience, internal_idf, global_idf):
+        self.term = term
+        self.salience = salience
+        self.iidf = internal_idf
+        self.gidf = global_idf
+
+    def __repr__(self):
+        return '<{} [S:{:.2f}|L:{:.2f}|G:{:.2f}]>'.format(self.term, self.salience, self.iidf, self.gidf)
+
+    def __eq__(self, other):
+        return self.term == other.term
+
+    def __hash__(self):
+        return hash(self.term)
+
+    def __contains__(self, term):
+        return term.term in self.term
+
+    def to_json(self):
+        return self.__dict__
+
+
 class SemSim():
     """
     Clusters tokenized documents by semantic similarity.
@@ -74,7 +132,7 @@ class SemSim():
         if not pairs:
             return 0
 
-        sims, sals = zip(*[(sim, (self.saliences[t1] + self.saliences[t2])/2) for t1, t2, sim, in pairs])
+        sims, sals = zip(*[(sim, (t1.salience + t2.salience)/2) for t1, t2, sim, in pairs])
 
         return sum(sim * sal for sim, sal in zip(sims, sals))/sum(sals)
 
@@ -83,6 +141,9 @@ class SemSim():
         """
         Get word2vec similarity for two terms.
         """
+        t1 = t1.term
+        t2 = t2.term
+
         if t1 == t2:
             return 1.
 
@@ -123,7 +184,6 @@ class SemSim():
         """
         Compute the full similarity matrix for some documents
         """
-
         if self.debug:
             print('building similarity matrix...')
 
@@ -203,13 +263,11 @@ class SemSim():
 
         Pairs are returned with the similarities so they don't need to be re-computed.
         """
-        pairs = set()
+        pairs1 = set()
+        pairs2 = set()
 
-        d1 = list(d1)
-        d2 = list(d2)
-
-        if not d1 or not d2:
-            return pairs
+        if not d1.terms or not d2.terms:
+            return set()
 
         # Extract sub-similarity-matrix for the terms here
         rows = [[self.w2v_term_map[t]] for t in d1]
@@ -231,14 +289,16 @@ class SemSim():
         # Create max-sim pairs
         # Max-sim pairs for d1->d2
         for i, j in enumerate(np.argmax(sub_mat, axis=1)):
-            pairs.add((d1[i], d2[j], sub_mat[i,j]))
+            pairs1.add((d1[i], d2[j], sub_mat[i,j]))
+        d1.pairs[d2] = pairs1
 
         # Max-sim pairs for d2->d1
         for j, i in enumerate(np.argmax(sub_mat, axis=0)):
             # Add in this order so we recognize duplicate pairs
-            pairs.add((d1[i], d2[j], sub_mat[i,j]))
+            pairs2.add((d1[i], d2[j], sub_mat[i,j]))
+        d2.pairs[d1] = pairs2
 
-        return pairs
+        return pairs1.union(pairs2)
 
 
     def _prune(self, docs):
@@ -249,7 +309,7 @@ class SemSim():
             - those which are totally subsumed by a phrase
         This improves runtime and should improve output quality
         """
-        redundant = {t for t in self.all_terms if gram_size(t) == 1}
+        redundant = {t for t in self.all_terms if gram_size(t.term) == 1}
 
         # This could be more efficient
         for doc in docs:
@@ -270,34 +330,59 @@ class SemSim():
         if self.debug:
             print('Removed {0} redundant terms'.format(len(redundant)))
 
-        pruned = []
+        # For debugging purposes, keep track of of which terms were removed
+        pruned = redundant
+
         for doc in docs:
-            pruned.append([t for t in doc if self.saliences[t] >= self.min_salience and self.iidf[t] < 1.0 and t not in redundant])
-        return pruned
+            original_terms = set(doc.terms)
+            doc.terms = [t for t in doc if t.salience >= self.min_salience and t.iidf < 1.0 and t not in redundant]
+
+            # See what terms were removed
+            removed = original_terms.difference(set(doc.terms))
+            pruned = pruned.union(removed)
+
+        return docs, pruned
 
 
     def _preprocess(self, docs):
-        self.raw_docs = docs
+        raw_docs = docs
 
         if self.debug:
-            print('clustering {0} docs'.format(len(self.raw_docs)))
+            print('clustering {0} docs'.format(len(raw_docs)))
 
         # Represent docs as list of terms
-        self.docs = self._tokenize(self.raw_docs)
+        self.docs = self._tokenize(raw_docs)
 
         # Compute intra-comment IDF and salience for all terms
         self.iidf = self._internal_idf(self.docs)
         self.all_terms = {t for terms in self.docs for t in terms}
         self.saliences = {t: self._salience(t) for t in self.all_terms}
 
+        # Proper representations
+        # Keep it so that each term only has one Term instance
+        # TO DO clean this up
+        self.all_terms = {Term(t, self.saliences[t], self.iidf[t], idf[t]) for t in self.all_terms}
+        term_map = {t.term: t for t in self.all_terms}
+        self.docs = [Doc(i, raw_docs[i], [term_map[t] for t in doc]) for i, doc in enumerate(self.docs)]
+
         # testing
         self.all_terms_unfiltered = self.all_terms
 
-        self.docs = self._prune(self.docs)
+        self.docs, self.pruned = self._prune(self.docs)
         self.all_terms = {t for terms in self.docs for t in terms}
+
+        # Compute normalized saliences
+        self.normalized_saliences = {}
+        mxm = max(self.saliences.values())
+        for k, v in self.saliences.items():
+            self.normalized_saliences[k] = v/mxm
+        for t in self.all_terms:
+            t.normalized_salience = self.normalized_saliences[t.term]
 
         if self.debug:
             print('vocabulary has {0} terms'.format(len(self.all_terms)))
+
+        return self.docs
 
 
     def _distance_matrix(self):
@@ -318,8 +403,8 @@ class SemSim():
 
 
     # TO DO clean this up
-    def cluster(self, docs, eps):
-        self._preprocess(docs)
+    def cluster(self, raw_docs, eps):
+        self._preprocess(raw_docs)
         dist_mat = self._distance_matrix()
 
         if self.debug:
@@ -332,49 +417,25 @@ class SemSim():
             except ValueError:
                 pass
 
-
-        # Represented docs in condensed form:
-        # [(term, freq), ...]
-
-        self.normalized_saliences = {}
-        mxm = max(self.saliences.values())
-        for k, v in self.saliences.items():
-            self.normalized_saliences[k] = v/mxm
-
-        condensed_docs = [[(t, f, self.normalized_saliences[t]) for t, f in list(Counter(d).items())] for d in self.docs]
-
-
         if self.debug:
             print('highlighting docs....')
-
-        highlighted_docs = []
-        for i, doc in enumerate(self.raw_docs):
-            d = markup_highlights(doc, self.docs[i])
-            highlighted_docs.append(d)
+        for doc in self.docs:
+            doc.highlighted = markup_highlights(doc.raw, doc.terms)
 
         clusters = cluster(dist_mat, eps, min_samples=3)
-        if clusters:
-            clusters = [[(
-                i,
-                self.raw_docs[i],
-                highlighted_docs[i],
-                sorted(condensed_docs[i], key=lambda t: self.saliences[t[0]], reverse=True)
-            ) for i in clus] for clus in clusters]
+        clusters = [[self.docs[i] for i in clus] for clus in clusters]
 
         # Build descriptors for each cluster
         # TO DO clean this up
         descriptors = []
-        for i, clus in enumerate(clusters):
-            kw_sets = []
-            for j, (idx, c, hi, kws) in enumerate(clus):
-                kw_sets.append(set(kws))
+        for clus in clusters:
+            all_term_counts = defaultdict(int)
+            for doc in clus:
+                for term in set(doc.terms):
+                    all_term_counts[term] += 1
+            ranked_terms = [(term, all_term_counts[term] * term.salience) for term in sorted(all_term_counts.keys(), key=lambda t: all_term_counts[t] * t.salience, reverse=True)]
+            descriptors.append(ranked_terms)
 
-            all_kw_counts = defaultdict(int)
-            for kws in kw_sets:
-                for kw in kws:
-                    all_kw_counts[kw] += 1
-            ranked_kws = [(kw, all_kw_counts[kw] * self.saliences[kw], nsal) for kw, freq, nsal in sorted(all_kw_counts.keys(), key=lambda k: all_kw_counts[k] * self.saliences[k[0]], reverse=True)]
-            descriptors.append(ranked_kws)
         return clusters, descriptors
 
 
@@ -385,7 +446,7 @@ def markup_highlights(raw_doc, term_doc):
     in the document. All forms of the term will be highlighted.
     """
     doc = raw_doc
-    term_doc = set(term_doc)
+    term_doc = set([t.term for t in term_doc])
     term_doc = sorted(list(term_doc), key=lambda t: len(t), reverse=True) # Longest first
     for t in term_doc:
         for term in t.split(','):

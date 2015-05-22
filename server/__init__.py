@@ -2,12 +2,37 @@ import json
 from geiger import services
 from geiger.comment import Comment
 from flask import Flask, render_template, request, jsonify
+from flask.json import JSONEncoder
 from geiger.aspects import extract_highlights, select_highlights
-from geiger.semsim import SemSim, idf
+from geiger.semsim import SemSim
 from geiger.baseline import baseline
 
 
 app = Flask(__name__, static_folder='static', static_url_path='')
+
+
+class GeigerJSONEncoder(JSONEncoder):
+    """
+    Custom JSONEncoder which checks if a
+    class implements `to_json`, using it if it is found.
+    """
+    def default(self, obj):
+        # First check if a `to_json` method is available,
+        # since that is the trump card
+        if hasattr(obj, 'to_json'):
+            return obj.to_json()
+        try:
+            iterable = iter(obj)
+            return [self.default(o) for o in obj]
+        except TypeError:
+            pass
+        return self._encode(obj)
+
+    def _encode(self, obj):
+        if hasattr(obj, 'to_json'):
+            return obj.to_json()
+        return super().default(obj)
+app.json_encoder = GeigerJSONEncoder
 
 
 @app.route('/')
@@ -80,18 +105,17 @@ def geigerize():
 
 
     # Get salient terms
-    all_terms = sorted(list(semsim.all_terms), key=lambda k: semsim.saliences[k], reverse=True)
-    salient_terms = [(kw, semsim.saliences[kw], idf.get(kw, 0), semsim.iidf.get(kw, 0)) for kw in all_terms]
+    all_terms = sorted(list(semsim.all_terms), key=lambda t: t.salience, reverse=True)
 
     # Remove duplicates
     descriptors = [list(set(desc)) for desc in descriptors]
 
     return jsonify(results={
         'clusters': list(zip(clusters, descriptors)),
-        'terms': salient_terms,
-        'gidf': {t: idf[t] for t in semsim.all_terms},
-        'lidf': semsim.iidf,
-        'saliences': {t: semsim.saliences[t] for t in semsim.all_terms}
+        'terms': all_terms,
+        'gidf': {t.term: t.gidf for t in semsim.all_terms},
+        'lidf': {t.term: t.iidf for t in semsim.all_terms},
+        'saliences': {t.term: t.salience for t in semsim.all_terms}
     })
 
 
@@ -192,6 +216,6 @@ def _fetch_asset(url):
             'userDisplayName': '[the author]',
             'createDate': '1431494183',
             'replies': []
-        }) for i, d in enumerate(data) if len(d['body']) > 140]
+        }) for i, d in enumerate(data) if len(d['body']) > 140][:20]
 
     return title, body, comments
