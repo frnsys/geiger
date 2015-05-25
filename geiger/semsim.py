@@ -19,9 +19,10 @@ class Doc():
         self.terms = sorted(terms, key=lambda t: t.salience, reverse=True)
         self.term_freqs = {t: f for t, f in list(Counter(self.terms).items())}
 
-        # Keep track of max-sim pairs against each other document
+        # Keep track of max-sim pairs and similarities against each other document
         # (for debugging)
         self.pairs = {}
+        self.sims = {}
 
     def __iter__(self):
         return iter(self.terms)
@@ -43,6 +44,7 @@ class Doc():
             'terms_uniq': [t.to_json() for t in set(self.terms)],
             'term_freqs': {t.term: f for t, f in self.term_freqs.items()},
             'pairs': {d.id: [(t1.term, t2.term, sim) for t1, t2, sim in pairs] for d, pairs in self.pairs.items()},
+            'sims': {d.id: sim for d, sim in self.sims.items()},
             'highlighted': getattr(self, 'highlighted', None)
         }
 
@@ -55,7 +57,13 @@ class Term():
         self.gidf = global_idf
 
     def __repr__(self):
-        return '<{} [S:{:.2f}|L:{:.2f}|G:{:.2f}]>'.format(self.term, self.salience, self.iidf, self.gidf)
+        return '<{}{}{} [S:{:.2f}|L:{:.2f}|G:{:.2f}]>'.format(
+            '\033[92m',
+            self.term,
+            '\033[0m',
+            self.salience,
+            self.iidf,
+            self.gidf)
 
     def __eq__(self, other):
         return self.term == other.term
@@ -77,7 +85,7 @@ class SemSim():
     A "term" is a keyword or a keyphrase.
     """
 
-    def __init__(self, debug=False, min_salience=0.55):
+    def __init__(self, debug=False, min_salience=0.4):
         self.debug = debug
         self.min_salience = min_salience
 
@@ -134,7 +142,13 @@ class SemSim():
 
         sims, sals = zip(*[(sim, (t1.salience + t2.salience)/2) for t1, t2, sim, in pairs])
 
-        return sum(sim * sal for sim, sal in zip(sims, sals))/sum(sals)
+        sim = sum(sim * sal for sim, sal in zip(sims, sals))/sum(sals)
+
+        # For debugging
+        d1.sims[d2] = sim
+        d2.sims[d1] = sim
+
+        return sim
 
 
     def _term_sim(self, t1, t2):
@@ -309,38 +323,45 @@ class SemSim():
             - those which are totally subsumed by a phrase
         This improves runtime and should improve output quality
         """
-        redundant = {t for t in self.all_terms if gram_size(t.term) == 1}
+        #redundant = {t for t in self.all_terms if gram_size(t.term) == 1}
 
         # This could be more efficient
-        for doc in docs:
-            cleared = set()
-            for t in redundant:
-                if t not in doc:
-                    continue
+        #for doc in docs:
+            #cleared = set()
+            #for t in redundant:
+                #if t not in doc:
+                    #continue
 
-                # If this term occurs outside of a phrase,
-                # it is no longer a candidate
-                n = doc.count(t)
-                d = sum(1 for t_ in doc if t != t_ and t in t_)
-                if n > d:
-                    cleared.add(t)
+                ## If this term occurs outside of a phrase,
+                ## it is no longer a candidate
+                #n = doc.count(t)
+                #d = sum(1 for t_ in doc if t != t_ and t in t_)
+                #if n > d:
+                    #cleared.add(t)
 
-            redundant = redundant.difference(cleared)
+            #redundant = redundant.difference(cleared)
 
-        if self.debug:
-            print('Removed {0} redundant terms'.format(len(redundant)))
+        #if self.debug:
+            #print('Removed {0} redundant terms'.format(len(redundant)))
+            #print(redundant)
 
-        # For debugging purposes, keep track of of which terms were removed
-        pruned = redundant
+        ## For debugging purposes, keep track of of which terms were removed
+        #pruned = redundant
+
+        pruned = set()
+        redundant = set()
 
         for doc in docs:
             original_terms = set(doc.terms)
-            doc.terms = [t for t in doc if t.salience >= self.min_salience and t.iidf < 1.0 and t not in redundant]
+            #doc.terms = [t for t in doc if t.salience >= self.min_salience and t.iidf < 1.0 and t not in redundant]
+            doc.terms = [t for t in doc if t.salience >= self.min_salience]
 
             # See what terms were removed
             removed = original_terms.difference(set(doc.terms))
             pruned = pruned.union(removed)
 
+        print('Pruned:')
+        print(pruned)
         return docs, pruned
 
 
