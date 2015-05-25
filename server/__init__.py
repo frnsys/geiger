@@ -6,6 +6,7 @@ from flask.json import JSONEncoder
 from geiger.aspects import extract_highlights, select_highlights
 from geiger.semsim import SemSim
 from geiger.baseline import baseline
+from geiger.evaluate import evaluate as eval
 
 
 app = Flask(__name__, static_folder='static', static_url_path='')
@@ -22,6 +23,10 @@ class GeigerJSONEncoder(JSONEncoder):
         if hasattr(obj, 'to_json'):
             return obj.to_json()
         try:
+            # Strings are technically iterable but we want to return them as is.
+            # Otherwise they are recursively iterable
+            if isinstance(obj, str):
+                return obj
             iterable = iter(obj)
             return [self.default(o) for o in obj]
         except TypeError:
@@ -38,6 +43,14 @@ app.json_encoder = GeigerJSONEncoder
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.route('/evaluate')
+def evaluate():
+    datasets = [
+        'climate_change'
+    ]
+    return render_template('evaluate.html', datasets=datasets)
 
 
 @app.route('/talked-about', defaults={'url':''})
@@ -177,6 +190,22 @@ def talked_about():
         })
 
     return jsonify(results=results)
+
+
+@app.route('/api/evaluate', methods=['POST'])
+def evaluate_api():
+    data = request.get_json()
+    dataset = 'data/evaluate/{}.txt'.format(data['dataset'])
+    kw_results, clus_results, docs, all_terms, pruned, true_labels, pred_labels = eval(dataset)
+
+    return jsonify(results={
+        'docs': docs,
+        'terms': all_terms,
+        'pruned': pruned,
+        'keywords': kw_results,
+        'true_labels': true_labels,
+        'pred_labels': pred_labels
+    })
 
 
 def _fetch_asset(url):

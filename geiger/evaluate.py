@@ -125,4 +125,4 @@ def evaluate(truth_file):
                 'scores': scores
             })
 
-    return kw_results, clus_results, s.docs, s.all_terms, s.pruned, all_true_labels
+    return kw_results, clus_results, s.docs, s.all_terms, s.pruned, all_true_labels, raw_pred_labels

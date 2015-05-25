@@ -1,0 +1,266 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<header class="primary-header">
+    <h1>Geiger</h1>
+    <select>
+        {% for dataset in datasets %}
+            <option value="{{ dataset }}">{{ dataset }}</option>
+        {% endfor %}
+    </select>
+    <button class="go-evaluate" type="submit">Evaluate</button>
+</header>
+
+<div class="tabbed">
+    <div class="geiger">
+        <div class="loading hide">
+            <div class="loader"></div>
+            <h4>Loading Geiger results...</h4>
+        </div>
+        <div class="error hide"></div>
+        <div class="top-terms hide">
+            <h5>Most salient terms</h5>
+            <ul class="terms"></ul>
+        </div>
+        <ul class="thread"></ul>
+        <div class="pruned-terms hide">
+            <h5>Pruned terms</h5>
+            <ul class="terms"></ul>
+        </div>
+    </div>
+</div>
+
+
+<script type="text/html" id="doc_tmpl">
+    <li class="comment">
+        <p>{0}</p>
+        <ul class="cluster-terms terms">{1}</ul>
+        <ul class="keywords">
+            <li><b>expected:</b> {2}</li>
+            <li><b>missing:</b> {3}</li>
+            <li><b>extra:</b> {4}</li>
+        </ul>
+        <h6 class="support"><a href="#" class="commenters">details</a></h6>
+        <ul class="cohort hide">{5}</ul>
+    </li>
+</script>
+
+<script type="text/html" id="compare_tmpl">
+    <li class="compare">
+        <p>
+            {0}
+            <span class="similarity">{1}</span>
+            <span class="co-cluster">{2}</span>
+            <span class="pred-co-cluster">{3}</span>
+        </p>
+        <ul class="cluster-terms terms">{4}</ul>
+        <ul class="term-pairs terms">{5}</ul>
+    </li>
+</script>
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+<script src="/js/main.js"></script>
+<script type="text/javascript">
+    $(function() {
+        $('.go-evaluate').on('click', function() {
+            var dataset = $('select').val();
+            evaluate(dataset);
+        });
+
+        // Show cohort on click of deatils.
+        $('body').on('click', '.commenters', function(e) {
+            e.preventDefault();
+            var parent = $(this).closest('.comment');
+            if (parent.find('.cohort').css('display') == 'none') {
+                parent.find('.cohort').show();
+            } else {
+                parent.find('.cohort').hide();
+            }
+            return false;
+        });
+
+        // Term highlighting in comment body
+        $('body').on('mouseenter', '.geiger .comment .cohort .terms li', function() {
+            var term = $(this).data('term');
+            $(this).closest('.cohort').addClass('subdued');
+            $(this).closest('.cohort').find('.highlight[data-term="'+term+'"]').addClass('highlight-active');
+        });
+        $('body').on('mouseleave', '.geiger .comment .cohort .terms li', function() {
+            $('.highlight-active').removeClass('highlight-active');
+            $('.subdued').removeClass('subdued');
+        });
+
+        // IDF tooltips
+        $('body').on('mouseenter', '.term', function() {
+            var gidf = $(this).data('gidf'),
+                lidf = $(this).data('lidf'),
+                salience = $(this).data('salience');
+
+            $(this).append('<div class="idf-tooltip">Global idf: '+gidf.toFixed(3)+'<br />Local idf: '+lidf.toFixed(3)+'<br />Salience: '+salience.toFixed(3)+'</div>');
+        });
+        $('body').on('mouseleave', '.term', function() {
+            $(this).find('.idf-tooltip').remove();
+        });
+
+
+        function evaluate(dataset) {
+            var el = $('.geiger'),
+                thread = el.find('.thread'),
+                terms = el.find('.top-terms .terms'),
+                pruned = el.find('.pruned-terms .terms'),
+                term_groups = el.find('.top-terms, .pruned-terms');
+
+            el.find('.loading').show();
+            thread.empty();
+            terms.empty();
+            pruned.empty();
+            term_groups.hide();
+
+            $.ajax('/api/evaluate', {
+                method: 'POST',
+                accepts: 'application/json',
+                contentType: 'application/json',
+                dataType: 'json',
+                data: JSON.stringify({
+                    dataset: dataset,
+                }),
+                error: function(xhr, status, err) {
+                    el.find('.error').text(err).show();
+                },
+                success: function(data, status, xhr) {
+                    var data = data.results;
+
+                    // Render top salient terms
+                    for (var i=0; i < 20; i++) {
+                        var term = data.terms[i];
+                        terms.append(term_el(term, term.term));
+                    }
+
+                    // Render pruned terms
+                    for (var i=0; i < data.pruned.length; i++) {
+                        var term = data.pruned[i];
+                        pruned.append(term_el(term, term.term));
+                    }
+
+                    term_groups.removeClass('hide').show();
+
+                    // Render docs
+                    for (var i=0; i < data.docs.length; i++) {
+                        var doc = data.docs[i],
+                            term_html = '';
+
+                        // Show term info
+                        for (var j=0; j < doc.terms_uniq.length; j++) {
+                            var term = doc.terms_uniq[j];
+                            term_html += term_el(term, term.term + ' x' + doc.term_freqs[term.term].toString());
+                        }
+
+                        // Show info against all other docs
+                        var ids = [],
+                            compare_html = '';
+                        for (var id in doc.pairs) {
+                            if (doc.pairs.hasOwnProperty(id)) {
+                                ids.push(id);
+                            }
+                        }
+                        ids.sort(function(a, b) {
+                            return doc.sims[b] - doc.sims[a];
+                        });
+                        for (var j=0; j < ids.length; j++) {
+                            var id = ids[j],
+                                other = data.docs[id],
+                                pairs = doc.pairs[id],
+                                c_term_html = '',
+                                p_term_html = '';
+
+                            // Render max-sim term pairs
+                            for (var k=0; k < pairs.length; k++) {
+                                var pair = pairs[k],
+                                    term_1 = pairs[k][0],
+                                    term_2 = pairs[k][1],
+                                    term_sim = pairs[k][2];
+
+                                if (term_sim > 0) {
+                                    p_term_html += '<li style="background:#84D1DF;">' + term_1 + ' => ' + term_2 + ' (' + term_sim.toFixed(3) + ')</li>';
+                                } else {
+                                    p_term_html += '<li style="background:#aaa;">' + term_1 + ' => ' + term_2 + ' (' + term_sim + ')</li>';
+                                }
+                            }
+
+                            // Render max-sim term pairs coming the other way
+                            for (var k=0; k < other.pairs[i].length; k++) {
+                                var pair = other.pairs[i][k],
+                                    term_1 = other.pairs[i][k][0],
+                                    term_2 = other.pairs[i][k][1],
+                                    term_sim = other.pairs[i][k][2];
+
+                                if (term_sim > 0) {
+                                    p_term_html += '<li style="background:#E89833;">' + term_2 + ' <= ' + term_1 + ' (' + term_sim.toFixed(3) + ')</li>';
+                                } else {
+                                    p_term_html += '<li style="background:#aaa;">' + term_2 + ' <= ' + term_1 + ' (' + term_sim + ')</li>';
+                                }
+                            }
+
+                            // Render term representation of other doc
+                            for (var k=0; k < other.terms_uniq.length; k++) {
+                                var term = other.terms_uniq[k];
+                                c_term_html += term_el(term, term.term + ' x' + other.term_freqs[term.term].toString());
+                            }
+
+                            // See if these two should be assigned to the same cluster,
+                            // according to the true labels
+                            var true_same_cluster = false;
+                            for (var k=0; k < data.true_labels.length; k++) {
+                                var clus = data.true_labels[k];
+                                if (clus[i] == clus[id]) {
+                                    true_same_cluster = true;
+                                    break;
+                                }
+                            }
+
+                            // See if these two are at all assigned to the same cluster,
+                            // according to the predicted labels
+                            var label_intersect = data.pred_labels[i].filter(function(n) {
+                                                    return data.pred_labels[id].indexOf(n) != -1;
+                                                  });
+
+                            compare_html += $('#compare_tmpl')
+                                                .html()
+                                                .format(other.highlighted,
+                                                        doc.sims[id].toFixed(3),
+                                                        true_same_cluster ? '[SAME CLUSTER]' : '',
+                                                        label_intersect.length > 0 ? '[PRED CLUSTER]' : '',
+                                                        c_term_html,
+                                                        p_term_html);
+                        }
+
+                        hel = $('#doc_tmpl')
+                                .html()
+                                .format(doc.highlighted,
+                                        term_html,
+                                        data.keywords[doc.id].true,
+                                        data.keywords[doc.id].missing,
+                                        data.keywords[doc.id].extra,
+                                        compare_html);
+
+                        thread.append(hel);
+                    }
+
+                },
+                complete: function() {
+                    el.find('.loading').hide();
+                }
+            });
+        }
+
+        function term_el(term, text) {
+            return '<li style="background-color:'+ color_for_percent(term.normalized_salience) +
+                    ';" class="term" data-gidf="' + term.gidf + '" data-lidf="' + term.iidf + '" data-salience="' + term.salience + '">' +
+                    text + '</li>';
+        }
+
+    });
+</script>
+
+{% endblock %}

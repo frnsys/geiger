@@ -195,6 +195,22 @@ button {
     margin-bottom: 0;
 }
 
+.compare {
+    border-bottom: 1px solid #EC1A23;
+}
+.similarity {
+    font-weight: bold;
+    color: #3C76FC;
+}
+.co-cluster {
+    font-weight: bold;
+    color: #49EA7A;
+}
+.pred-co-cluster {
+    font-weight: bold;
+    color: #1BAFAE;
+}
+
 /* don't highlight geiger terms */
 .geiger .highlight {
     color: #222;
