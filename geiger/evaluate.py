@@ -35,7 +35,7 @@ def parse_clusters(fname):
         # We create permutations of every possible list of labels
         all_labels = list(product(*raw_labels))
 
-        return bodies, keywords, all_labels
+        return bodies, keywords, all_labels, raw_labels
 
 
 def most_similar(cluster, clusters):
@@ -46,7 +46,7 @@ def most_similar(cluster, clusters):
 
 
 def evaluate(truth_file):
-    bodies, kws, all_true_labels = parse_clusters(truth_file)
+    bodies, kws, all_true_labels, raw_true_labels = parse_clusters(truth_file)
 
     # Check keyword tokenization against annotated keywords
     s = SemSim(debug=True)
@@ -125,4 +125,70 @@ def evaluate(truth_file):
                 'scores': scores
             })
 
-    return kw_results, clus_results, s.docs, s.all_terms, s.pruned, all_true_labels, raw_pred_labels
+    # Find correct and incorrect co-cluster pairings
+    classification_results = []
+    for i, doc in enumerate(bodies):
+        fp, fn, tp, tn = 0, 0, 0, 0
+        n_tp, n_tn = 0, 0
+        for j, doc_ in enumerate(bodies):
+            if i == j:
+                continue
+
+            # Check true
+            true_co_cluster = False
+            if set(raw_true_labels[i]).intersection(set(raw_true_labels[j])):
+                true_co_cluster = True
+                n_tp += 1
+            else:
+                n_tn += 1
+
+            # Check predicted
+            pred_co_cluster = False
+            if set(raw_pred_labels[i]).intersection(set(raw_pred_labels[j])):
+                pred_co_cluster = True
+
+            if true_co_cluster != pred_co_cluster:
+                if true_co_cluster:
+                    fn += 1
+                else:
+                    fp += 1
+            else:
+                if true_co_cluster:
+                    tp += 1
+                else:
+                    tn += 1
+        classification_results.append({
+            'fp': fp,
+            'fn': fn,
+            'tp': tp,
+            'tn': tn,
+            'tpr': tp/n_tp if n_tp else 1,
+            'tnr': tn/n_tn if n_tn else 1
+        })
+
+    summary = {
+        'avg_p_found': sum(r['p_found'] for r in kw_results)/len(kw_results),
+        'avg_extra': sum(len(r['extra']) for r in kw_results)/len(kw_results),
+        'avg_fp': sum(r['fp'] for r in classification_results)/len(classification_results),
+        'avg_fn': sum(r['fn'] for r in classification_results)/len(classification_results),
+        'avg_tpr': sum(r['tpr'] for r in classification_results)/len(classification_results),
+        'avg_tnr': sum(r['tnr'] for r in classification_results)/len(classification_results),
+        'clf_results': classification_results
+    }
+
+    # TEMP
+    import numpy as np
+    tsimmat = s.w2v_sim_mat.copy()
+    tsimmat[np.where(tsimmat == 1.)] = -1
+    for term in s.all_terms:
+        idx = s.w2v_term_map[term]
+        top = np.nanargmax(tsimmat[idx])
+        sim = np.nanmax(tsimmat[idx])
+        # bleh
+        for k, v in s.w2v_term_map.items():
+            if v == top:
+                match = k
+                break
+        print('({}, {}, {})'.format(term, match, sim))
+
+    return kw_results, clus_results, s.docs, s.all_terms, s.pruned, all_true_labels, raw_pred_labels, summary

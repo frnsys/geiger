@@ -45,6 +45,7 @@ class Doc():
             'term_freqs': {t.term: f for t, f in self.term_freqs.items()},
             'pairs': {d.id: [(t1.term, t2.term, sim) for t1, t2, sim in pairs] for d, pairs in self.pairs.items()},
             'sims': {d.id: sim for d, sim in self.sims.items()},
+            'dists': {d.id: 1/sim - 1 if sim else 9999999. for d, sim in self.sims.items()},
             'highlighted': getattr(self, 'highlighted', None)
         }
 

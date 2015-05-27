@@ -196,7 +196,7 @@ def talked_about():
 def evaluate_api():
     data = request.get_json()
     dataset = 'data/evaluate/{}.txt'.format(data['dataset'])
-    kw_results, clus_results, docs, all_terms, pruned, true_labels, pred_labels = eval(dataset)
+    kw_results, clus_results, docs, all_terms, pruned, true_labels, pred_labels, summary = eval(dataset)
 
     return jsonify(results={
         'docs': docs,
@@ -204,7 +204,8 @@ def evaluate_api():
         'pruned': pruned,
         'keywords': kw_results,
         'true_labels': true_labels,
-        'pred_labels': pred_labels
+        'pred_labels': pred_labels,
+        'summary': summary
     })
 
 

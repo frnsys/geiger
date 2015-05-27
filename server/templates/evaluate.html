@@ -18,6 +18,10 @@
             <h4>Loading Geiger results...</h4>
         </div>
         <div class="error hide"></div>
+        <div class="overall-summary hide">
+            <h5>Summary</h5>
+            <ul></ul>
+        </div>
         <div class="top-terms hide">
             <h5>Most salient terms</h5>
             <ul class="terms"></ul>
@@ -40,8 +44,14 @@
             <li><b>missing:</b> {3}</li>
             <li><b>extra:</b> {4}</li>
         </ul>
+        <ul class="summary">
+            <li><b>true positives:</b> {5} ({6}%)</li>
+            <li><b>true negatives:</b> {7} ({8}%)</li>
+            <li><b>false positives:</b> {9}</li>
+            <li><b>false negatives:</b> {10}</li>
+        </ul>
         <h6 class="support"><a href="#" class="commenters">details</a></h6>
-        <ul class="cohort hide">{5}</ul>
+        <ul class="cohort hide">{11}</ul>
     </li>
 </script>
 
@@ -50,14 +60,23 @@
         <p>
             {0}
             <span class="similarity">{1}</span>
-            <span class="co-cluster">{2}</span>
-            <span class="pred-co-cluster">{3}</span>
+            <span class="distance">({2})</span>
+            <span class="co-cluster">{3}</span>
+            <span class="pred-co-cluster">{4}</span>
         </p>
-        <ul class="cluster-terms terms">{4}</ul>
-        <ul class="term-pairs terms">{5}</ul>
+        <ul class="cluster-terms terms">{5}</ul>
+        <ul class="term-pairs terms">{6}</ul>
     </li>
 </script>
 
+<script type="text/html" id="summary_tmpl">
+    <li><b>avg % true kws found:</b> {0}%</li>
+    <li><b>avg # extra kws found:</b> {1}</li>
+    <li><b>avg % true positives:</b> {2}%</li>
+    <li><b>avg % true negatives:</b> {3}%</li>
+    <li><b>avg # false positives:</b> {4}</li>
+    <li><b>avg # false negatives:</b> {5}</li>
+</script>
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
 <script src="/js/main.js"></script>
@@ -107,14 +126,16 @@
         function evaluate(dataset) {
             var el = $('.geiger'),
                 thread = el.find('.thread'),
+                summary = el.find('.overall-summary ul'),
                 terms = el.find('.top-terms .terms'),
                 pruned = el.find('.pruned-terms .terms'),
-                term_groups = el.find('.top-terms, .pruned-terms');
+                term_groups = el.find('.top-terms, .pruned-terms, .overall-summary');
 
             el.find('.loading').show();
             thread.empty();
             terms.empty();
             pruned.empty();
+            summary.empty();
             term_groups.hide();
 
             $.ajax('/api/evaluate', {
@@ -142,6 +163,17 @@
                         var term = data.pruned[i];
                         pruned.append(term_el(term, term.term));
                     }
+
+                    // Render overall summary
+                    var summary_html = $('#summary_tmpl')
+                        .html()
+                        .format((data.summary.avg_p_found * 100).toFixed(2),
+                               data.summary.avg_extra.toFixed(2),
+                               (data.summary.avg_tpr * 100).toFixed(2),
+                               (data.summary.avg_tnr * 100).toFixed(2),
+                               data.summary.avg_fp.toFixed(2),
+                               data.summary.avg_fn.toFixed(2));
+                    summary.html(summary_html);
 
                     term_groups.removeClass('hide').show();
 
@@ -229,6 +261,7 @@
                                                 .html()
                                                 .format(other.highlighted,
                                                         doc.sims[id].toFixed(3),
+                                                        doc.dists[id].toFixed(3),
                                                         true_same_cluster ? '[SAME CLUSTER]' : '',
                                                         label_intersect.length > 0 ? '[PRED CLUSTER]' : '',
                                                         c_term_html,
@@ -242,6 +275,12 @@
                                         data.keywords[doc.id].true,
                                         data.keywords[doc.id].missing,
                                         data.keywords[doc.id].extra,
+                                        data.summary.clf_results[doc.id].tp,
+                                        (data.summary.clf_results[doc.id].tpr * 100).toFixed(2),
+                                        data.summary.clf_results[doc.id].tn,
+                                        (data.summary.clf_results[doc.id].tnr * 100).toFixed(2),
+                                        data.summary.clf_results[doc.id].fp,
+                                        data.summary.clf_results[doc.id].fn,
                                         compare_html);
 
                         thread.append(hel);
