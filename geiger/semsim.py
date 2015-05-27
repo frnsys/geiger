@@ -86,7 +86,7 @@ class SemSim():
     A "term" is a keyword or a keyphrase.
     """
 
-    def __init__(self, debug=False, min_salience=0.4):
+    def __init__(self, debug=False, min_salience=0.2):
         self.debug = debug
         self.min_salience = min_salience
 
@@ -142,6 +142,7 @@ class SemSim():
             return 0
 
         sims, sals = zip(*[(sim, (t1.salience + t2.salience)/2) for t1, t2, sim, in pairs])
+        #sims, sals = zip(*[(sim, (t1.salience + t2.salience)/2) if sim > 0 else (sim, min(t1.salience, t2.salience)) for t1, t2, sim, in pairs])
 
         sim = sum(sim * sal for sim, sal in zip(sims, sals))/sum(sals)
 
@@ -420,7 +421,7 @@ class SemSim():
         sim_mat[np.where(sim_mat == 0)] = 0.000001
         dist_mat = 1/sim_mat - 1
         self.sim_mat = sim_mat
-
+        self.dist_mat = dist_mat
         return dist_mat
 
 
@@ -444,7 +445,7 @@ class SemSim():
         for doc in self.docs:
             doc.highlighted = markup_highlights(doc.raw, doc.terms)
 
-        clusters = cluster(dist_mat, eps, min_samples=3)
+        clusters = cluster(dist_mat, eps, min_samples=2)
         clusters = [[self.docs[i] for i in clus] for clus in clusters]
 
         # Build descriptors for each cluster
@@ -460,6 +461,71 @@ class SemSim():
 
         return clusters, descriptors
 
+
+    def _vec_reps(self):
+        """
+        Creates salience-weighted vector representations for documents
+        """
+
+        # Keep track of which term pairs collapse
+        self.collapse_map = {}
+
+        # Identify which terms to collapse
+        tsimmat = self.w2v_sim_mat.copy()
+        tsimmat[np.where(tsimmat == 1.)] = -1
+        for term in self.all_terms:
+            idx = self.w2v_term_map[term]
+            top = np.nanargmax(tsimmat[idx])
+            sim = np.nanmax(tsimmat[idx])
+
+            if sim >= 0.8: # cutoff
+                # bleh, find matching term by index
+                for k, v in self.w2v_term_map.items():
+                    if v == top:
+                        match = k
+                        break
+
+                # Only collapse terms of the same gram size
+                # This is because phrases which share a word in common tend to have
+                # a higher similarity, because they share a word in common
+                # TO DO could collapse terms of diff gram sizes but require a higher
+                # sim threshold
+                if gram_size(term.term) == gram_size(match.term):
+                    # If either term is already in the collapse map
+                    if term in self.collapse_map:
+                        self.collapse_map[match] = self.collapse_map[term]
+                    elif match in self.collapse_map:
+                        self.collapse_map[term] = self.collapse_map[match]
+                    else:
+                        self.collapse_map[term] = term
+                        self.collapse_map[match] = term
+
+        # Build the reduced term set
+        self.collapsed_terms = set()
+        for term in self.all_terms:
+            self.collapsed_terms.add(self.collapse_map.get(term, term))
+
+        print(len(self.all_terms))
+        print(len(self.collapsed_terms))
+
+        terms = list(self.collapsed_terms)
+
+        # Now we can build the vectors
+        # TO DO make this not ridiculous
+        vecs = []
+        for d in self.docs:
+            vec = []
+            for t in terms:
+                if t in d:
+                    vec.append(t.salience)
+                else:
+                    vec.append(0)
+            vecs.append(vec)
+
+        vecs = np.array(vecs)
+        print(vecs.shape)
+        print(vecs)
+        return vecs
 
 
 def markup_highlights(raw_doc, term_doc):

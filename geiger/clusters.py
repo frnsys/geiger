@@ -27,6 +27,9 @@ def cluster(dist_mat, eps, min_samples=3, redundant_cutoff=0.8):
         if clusters:
             agg_clusters[e] = clusters
             scores[e] = score_clusters(clusters, dist_mat.shape[0])
+            print('eps {} labels: {}'.format(e, labels))
+        else:
+            print('eps {} got no clusters'.format(e))
 
     best_eps = max(scores, key=lambda k: scores[k])
 

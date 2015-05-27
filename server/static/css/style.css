@@ -298,3 +298,13 @@ button {
   50% { color: #888; }
   100% { color: #aaa; }
 }
+
+.ref {
+  position: fixed;
+  left: 0;
+  width: 400px;
+  padding: 2em;
+}
+.ref .support {
+  display: none;
+}
