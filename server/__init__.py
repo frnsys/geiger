@@ -5,7 +5,7 @@ from flask import Flask, render_template, request, jsonify
 from flask.json import JSONEncoder
 from geiger.aspects import extract_highlights, select_highlights
 from geiger.semsim import SemSim
-from geiger.baseline import baseline
+from geiger.baseline import baseline, descriptor, highlight
 from geiger.evaluate import evaluate as eval
 
 
@@ -109,10 +109,10 @@ def geigerize():
         #sents += [s for s in sent_grp if prefilter(s)]
 
     semsim = SemSim(debug=True)
-    clusters, descriptors = semsim.cluster(bodies,
-                                           eps=[3.4, 3.5, 3.6, 3.7, 3.8, 3.9,
-                                                4.0, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9,
-                                                5.0, 5.1, 5.2, 5.3, 5.5, 5.5, 5.6, 5.7, 5.8, 5.9])
+    clusters, descriptors = semsim.cluster(bodies)
+                                           #eps=[3.4, 3.5, 3.6, 3.7, 3.8, 3.9,
+                                                #4.0, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9,
+                                                #5.0, 5.1, 5.2, 5.3, 5.5, 5.5, 5.6, 5.7, 5.8, 5.9])
 
 
     # Get salient terms
@@ -147,12 +147,19 @@ def baseline_cluster():
     # Remove duplicates
     bodies = list({c.body for c in comments})
 
-    clusters = baseline(bodies,
-                        eps=[1., 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9,
-                             2., 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9,
-                             3., 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9])
+    clusters = baseline(bodies)
+                        #eps=[1., 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9,
+                             #2., 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9,
+                             #3., 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9])
 
-    return jsonify(results=clusters)
+    descriptors = [descriptor(clus) for clus in clusters]
+    highlighted = [highlight(clus) for clus in clusters]
+
+    return jsonify(results={
+        'clusters': clusters,
+        'descriptors': descriptors,
+        'highlighted_clusters': highlighted
+    })
 
 
 @app.route('/api/talked-about', methods=['POST'])
@@ -247,6 +254,6 @@ def _fetch_asset(url):
             'userDisplayName': '[the author]',
             'createDate': '1431494183',
             'replies': []
-        }) for i, d in enumerate(data) if len(d['body']) > 140][:100]
+        }) for i, d in enumerate(data) if len(d['body']) > 140]
 
     return title, body, comments

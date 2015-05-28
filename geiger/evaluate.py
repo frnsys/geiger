@@ -56,7 +56,8 @@ def _evaluate_keywords(docs, keywords, verbose=True):
     """
     Check keyword tokenization against annotated keywords
     """
-    s = SemSim(debug=True)
+    s = SemSim(debug=True, idf_as_salience=False)
+    #s = SemSim(debug=True, idf_as_salience=True)
     results = []
     for i, toks in enumerate(s._preprocess(docs)):
         anno = set(keywords[i])
@@ -88,7 +89,8 @@ def evaluate(truth_file, verbose=True):
     kw_results = _evaluate_keywords(bodies, kws, verbose=verbose)
 
     # Check clustering performance
-    s = SemSim()
+    s = SemSim(debug=False, idf_as_salience=False)
+    #s = SemSim(debug=False, idf_as_salience=True)
     clus_results = []
     clusters, descriptors = s.cluster(bodies)
                                       #eps=[3.4, 3.5, 3.6, 3.7, 3.8, 3.9,
@@ -166,28 +168,31 @@ def evaluate(truth_file, verbose=True):
     # Show max-sim pairs across _all_ terms
     s._all_max_sim_pairs()
 
-    #print('----------------------')
-    #print('VECTOR REPRESENTATIONS')
-    #print('----------------------')
-    #vecs = s._vec_reps()
-    #print('----------------------')
-    #print('----------------------')
+    print('----------------------')
+    print('VECTOR REPRESENTATIONS')
+    print('----------------------')
+    vecs = s._vec_reps()
+    print('----------------------')
+    print('----------------------')
 
-    #from sklearn.cluster import MeanShift
-    #print('Mean shift clustering...')
-    #for bw in [0.2, 0.4, 0.8, 1.6, 2., 2.4, 2.6, 3.2]:
-        #print('bandwidth: {}'.format(bw))
-        #ms = MeanShift(cluster_all=False, bandwidth=bw)
-        #ms_labels = ms.fit_predict(vecs)
-        #print(ms_labels)
+    from sklearn.cluster import MeanShift
+    print('Mean shift clustering...')
+    for bw in [0.2, 0.4, 0.8, 1.6, 2., 2.4, 2.6, 3.2]:
+        print('bandwidth: {}'.format(bw))
+        ms = MeanShift(cluster_all=False, bandwidth=bw)
+        ms_labels = ms.fit_predict(vecs)
+        print(ms_labels)
 
-    #from sklearn.cluster import DBSCAN
-    #print('DBSCAN clustering...')
-    #for eps in [0.2, 0.4, 0.8, 1.2, 1.6, 2., 2.4, 2.6, 3.2, 4., 5., 6., 10., 20.]:
-        #print('eps: {}'.format(eps))
-        #db = DBSCAN(eps=eps, min_samples=2)
-        #db_labels = db.fit_predict(vecs)
-        #print(db_labels)
+    from sklearn.cluster import DBSCAN
+    from scipy.spatial.distance import pdist, squareform
+    print('DBSCAN clustering...')
+    dm_ = pdist(vecs, metric='euclidean')
+    dm_ = squareform(dm_)
+    for eps in estimate_eps(dm_):
+        print('eps: {}'.format(eps))
+        db = DBSCAN(eps=eps, min_samples=2, metric='precomputed')
+        db_labels = db.fit_predict(dm_)
+        print(db_labels)
 
     # To try and estimate a value for eps
     dm = s.dist_mat.copy()

@@ -73,8 +73,9 @@
 <script type="text/html" id="baseline_tmpl">
     <li class="comment">
         <p>{0}</p>
-        <h6 class="support"><a href="#" class="commenters"><span>{2}</span> comments</a></h6>
-        <ul class="cohort hide">{1}</ul>
+        <ul class="terms">{1}</ul>
+        <h6 class="support"><a href="#" class="commenters"><span>{3}</span> comments</a></h6>
+        <ul class="cohort hide">{2}</ul>
     </li>
 </script>
 
@@ -338,21 +339,30 @@
                     $('.tabs li[data-tab=baseline]').addClass('error');
                 },
                 success: function(data, status, xhr) {
-                    var data = data.results;
-                    for (var i=0; i < data.length; i++) {
-                        var clus = data[i],
+                    var data = data.results,
+                        clusters = data.clusters,
+                        descs = data.descriptors,
+                        his = data.highlighted_clusters;
+                    for (var i=0; i < clusters.length; i++) {
+                        var clus = clusters[i],
                             coh = '',
+                            term_html = '',
                             hel;
 
                         // List out the other sentences in this cohort.
                         for (var j=1; j < clus.length; j++) {
-                            coh += '<li>' + clus[j] + '</li>';
+                            coh += '<li>' + his[i][j] + '</li>';
+                        }
+
+                        // Show top 10 descriptors for the cluster
+                        for (var j=0; j < 10; j++) {
+                            term_html += '<li>' + descs[i][j] + '</li>';
                         }
 
                         // Build the HTML.
                         hel = $('#baseline_tmpl')
                                 .html()
-                                .format(clus[0], coh, clus.length);
+                                .format(his[i][0], term_html, coh, clus.length);
 
                         thread.append('{0}'.format(hel));
                     }

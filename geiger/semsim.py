@@ -86,9 +86,13 @@ class SemSim():
     A "term" is a keyword or a keyphrase.
     """
 
-    def __init__(self, debug=False, min_salience=0.2):
+    def __init__(self, debug=False, min_salience=0.2, idf_as_salience=False):
         self.debug = debug
         self.min_salience = min_salience
+
+        # You can set this to be true if you want to use avg local/global idf
+        # instead of salience (for testing purposes)
+        self.idf_as_salience = idf_as_salience
 
 
     def _tokenize(self, raw_docs):
@@ -259,11 +263,15 @@ class SemSim():
         """
         Compute the salience of a term
         """
+
         idf_c = self.iidf[t]
         sal_c = self._norm(idf_c)
 
         idf_g = idf.get(t, idf_c)
         sal_g = self._norm(idf_g)
+
+        if self.idf_as_salience:
+            return (idf_c + idf_g)/2
 
         return (sal_c + sal_g)/2
 
@@ -325,38 +333,39 @@ class SemSim():
             - those which are totally subsumed by a phrase
         This improves runtime and should improve output quality
         """
-        #redundant = {t for t in self.all_terms if gram_size(t.term) == 1}
+        redundant = {t for t in self.all_terms if gram_size(t.term) == 1}
 
         # This could be more efficient
-        #for doc in docs:
-            #cleared = set()
-            #for t in redundant:
-                #if t not in doc:
-                    #continue
+        for doc in docs:
+            cleared = set()
+            for t in redundant:
+                if t not in doc:
+                    continue
 
-                ## If this term occurs outside of a phrase,
-                ## it is no longer a candidate
-                #n = doc.count(t)
-                #d = sum(1 for t_ in doc if t != t_ and t in t_)
-                #if n > d:
-                    #cleared.add(t)
+                # If this term occurs outside of a phrase,
+                # it is no longer a candidate
+                n = doc.count(t)
+                d = sum(1 for t_ in doc if t != t_ and t in t_)
+                if n > d:
+                    cleared.add(t)
 
-            #redundant = redundant.difference(cleared)
+            redundant = redundant.difference(cleared)
 
-        #if self.debug:
-            #print('Removed {0} redundant terms'.format(len(redundant)))
-            #print(redundant)
+        if self.debug:
+            print('Removed {0} redundant terms'.format(len(redundant)))
+            print(redundant)
 
-        ## For debugging purposes, keep track of of which terms were removed
-        #pruned = redundant
-
-        pruned = set()
-        redundant = set()
+        # For debugging purposes, keep track of of which terms were removed
+        pruned = redundant
 
         for doc in docs:
             original_terms = set(doc.terms)
             #doc.terms = [t for t in doc if t.salience >= self.min_salience and t.iidf < 1.0 and t not in redundant]
-            doc.terms = [t for t in doc if t.salience >= self.min_salience]
+            if self.idf_as_salience:
+                doc.terms = [t for t in doc if t.salience >= self.min_salience and t.salience <= 0.9 and t not in redundant]
+            else:
+                #doc.terms = [t for t in doc if t.salience >= self.min_salience and t not in redundant]
+                doc.terms = [t for t in doc if t.salience >= self.min_salience]
 
             # See what terms were removed
             removed = original_terms.difference(set(doc.terms))

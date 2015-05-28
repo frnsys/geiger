@@ -5,6 +5,9 @@ from sklearn.cluster import DBSCAN
 
 
 def cluster(dist_mat, eps, min_samples=3, redundant_cutoff=0.8):
+    if eps is None:
+        eps = estimate_eps(dist_mat)
+
     # Mean nearest distances
     mean_nd = np.mean(np.apply_along_axis(lambda a: np.min(a[np.nonzero(a)]), 1, dist_mat))
     print('mean nearest distance: {0}'.format(mean_nd))
@@ -223,4 +226,4 @@ def estimate_eps(dist_mat, n_closest=5):
         #print('~~~~~~~~~~')
 
         estimates.append(eps_candidate)
-    return estimates
+        return sorted(estimates)

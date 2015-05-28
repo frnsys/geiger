@@ -9,10 +9,30 @@ from nltk.corpus import stopwords
 from geiger.clusters import cluster
 
 
-def baseline(docs, eps=[0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95], metric='euclidean'):
+def baseline(docs, eps=None, metric='euclidean'):
     dist_mat = _compute_dist_mat(docs, metric)
     clusters = cluster(dist_mat, eps)
     return [[docs[i] for i in clus] for clus in clusters]
+
+
+from nytnlp.tokenize.keyword import keyword_tokenizes
+from nytnlp.util import idf
+from geiger.semsim import idf as gidf
+def descriptor(docs):
+    t_docs = keyword_tokenizes(docs)
+    lidf = idf(t_docs)
+    all_terms = list({t for terms in t_docs for t in terms})
+    return sorted(all_terms, key=lambda t: score_descriptor_term(t, lidf, t_docs), reverse=True)
+
+from nytnlp.markup import markup_terms
+def highlight(docs):
+    t_docs = keyword_tokenizes(docs)
+    return markup_terms(docs, t_docs)
+
+def score_descriptor_term(term, lidf, t_docs):
+    # Avg term frequency
+    tf = sum(td.count(term) for td in t_docs)/len(t_docs)
+    return 1/lidf[term] * gidf.get(term, 1.) * tf
 
 
 def _compute_dist_mat(docs, metric):
