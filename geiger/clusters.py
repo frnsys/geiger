@@ -2,7 +2,6 @@ import math
 import numpy as np
 from collections import defaultdict
 from sklearn.cluster import DBSCAN
-from sklearn.metrics import silhouette_score
 
 
 def cluster(dist_mat, eps, min_samples=3, redundant_cutoff=0.8):
@@ -175,6 +174,7 @@ def _clus_mat(dist_mat, indices):
     rows, cols = zip(*[([i], i) for i in indices])
     return dist_mat[rows, cols]
 
+
 def _inter_clus_mat(dist_mat, indices1, indices2):
     """
     Returns a submatrix presenting the distance matrix between two clusters' members.
@@ -182,3 +182,45 @@ def _inter_clus_mat(dist_mat, indices1, indices2):
     rows = [[i] for i in indices1]
     cols = indices2
     return dist_mat[rows, cols]
+
+
+def estimate_eps(dist_mat, n_closest=5):
+    """
+    Estimates possible eps values (to be used with DBSCAN)
+    for a given distance matrix by looking at the largest distance "jumps"
+    amongst the `n_closest` distances for each item.
+
+    Tip: the value for `n_closest` is important - set it too large and you may only get
+    really large distances which are uninformative. Set it too small and you may get
+    premature cutoffs (i.e. select jumps which are really not that big).
+
+    TO DO this could be fancier by calculating support for particular eps values,
+    e.g. 80% are around 4.2 or w/e
+    """
+    dist_mat = dist_mat.copy()
+
+    # To ignore i == j distances
+    dist_mat[np.where(dist_mat == 0)] = np.inf
+    estimates = []
+    for i in range(dist_mat.shape[0]):
+        # Indices of the n closest distances
+        row = dist_mat[i]
+        dists = sorted(np.partition(row, n_closest)[:n_closest])
+        difs = [(x,
+                 y,
+                 (y - x)) for x, y in zip(dists, dists[1:])]
+        eps_candidate, _, jump = max(difs, key=lambda x: x[2])
+
+        # TO DO add proper logging
+        #print('~~~~~~~~~~')
+        #difs_strs = [('{:.2f}'.format(x),
+                      #'{:.2f}'.format(y),
+                      #'{:.2f}'.format(y - x)) for x, y in zip(dists, dists[1:])]
+        #print(dists)
+        #print(difs_strs)
+        #print(eps_candidate)
+        #print(jump)
+        #print('~~~~~~~~~~')
+
+        estimates.append(eps_candidate)
+    return estimates

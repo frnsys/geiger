@@ -5,7 +5,7 @@ from collections import Counter, defaultdict
 from geiger.text.tokenize import extract_phrases, keyword_tokenize, gram_size, lemma_forms
 from geiger.util.progress import Progress
 from geiger.knowledge import W2V, IDF
-from geiger.clusters import cluster
+from geiger.clusters import cluster, estimate_eps
 
 import config
 w2v = W2V(remote=config.remote)
@@ -426,7 +426,7 @@ class SemSim():
 
 
     # TO DO clean this up
-    def cluster(self, raw_docs, eps):
+    def cluster(self, raw_docs, eps=None):
         self._preprocess(raw_docs)
         dist_mat = self._distance_matrix()
 
@@ -445,6 +445,8 @@ class SemSim():
         for doc in self.docs:
             doc.highlighted = markup_highlights(doc.raw, doc.terms)
 
+        if eps is None:
+            eps = estimate_eps(dist_mat)
         clusters = cluster(dist_mat, eps, min_samples=2)
         clusters = [[self.docs[i] for i in clus] for clus in clusters]
 
@@ -460,6 +462,27 @@ class SemSim():
             descriptors.append(ranked_terms)
 
         return clusters, descriptors
+
+
+    def _all_max_sim_pairs(self):
+        """
+        Show max-sim pairs across _all_ terms.
+        Requires that the w2v sim mat is already computed
+
+        (mainly for debugging)
+        """
+        tsimmat = self.w2v_sim_mat.copy()
+        tsimmat[np.where(tsimmat == 1.)] = -1
+        for term in self.all_terms:
+            idx = self.w2v_term_map[term]
+            top = np.nanargmax(tsimmat[idx])
+            sim = np.nanmax(tsimmat[idx])
+            # bleh, not efficient
+            for k, v in self.w2v_term_map.items():
+                if v == top:
+                    match = k
+                    break
+            print('({}, {}, {})'.format(term, match, sim))
 
 
     def _vec_reps(self):
