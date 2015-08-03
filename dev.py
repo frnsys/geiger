@@ -37,7 +37,7 @@ def word2vec():
 
 def phrases():
     print('Loading phrases model...')
-    bigram = Phrases.load('data/bigram_model.phrases')
+    bigram = Phrases.load('data/nyt/bigram_model.phrases')
 
     print('Creating listener...')
     address = ('localhost', 6001)
@@ -55,7 +55,7 @@ def phrases():
 
 def idf():
     print('Loading idf...')
-    idf = json.load(open('data/idf.json', 'r'))
+    idf = json.load(open('data/nyt/idf.json', 'r'))
     mxm = max(idf.values())
     for k, v in idf.items():
         idf[k] = v/mxm

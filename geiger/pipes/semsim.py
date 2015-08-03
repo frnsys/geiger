@@ -1,11 +1,10 @@
-import re
 import math
 import numpy as np
+from broca import Pipe
+from broca.common.util import gram_size
 from collections import Counter, defaultdict
-from geiger.text.tokenize import extract_phrases, keyword_tokenize, gram_size, lemma_forms
-from geiger.util.progress import Progress
 from geiger.knowledge import W2V, IDF
-from geiger.clusters import cluster, estimate_eps
+from sup.progress import Progress
 
 import config
 w2v = W2V(remote=config.remote)
@@ -13,9 +12,8 @@ idf = IDF(remote=config.remote)
 
 
 class Doc():
-    def __init__(self, id, raw, terms):
+    def __init__(self, id, terms):
         self.id = id
-        self.raw = raw
         self.terms = sorted(terms, key=lambda t: t.salience, reverse=True)
         self.term_freqs = {t: f for t, f in list(Counter(self.terms).items())}
 
@@ -33,13 +31,9 @@ class Doc():
     def __getitem__(self, i):
         return self.terms[i]
 
-    def count(self, term):
-        return self.raw.count(term.term)
-
     def to_json(self):
         return {
             'id': self.id,
-            'raw': self.raw,
             'terms': [t.to_json() for t in self.terms],
             'terms_uniq': [t.to_json() for t in set(self.terms)],
             'term_freqs': {t.term: f for t, f in self.term_freqs.items()},
@@ -79,12 +73,14 @@ class Term():
         return self.__dict__
 
 
-class SemSim():
+class SemSim(Pipe):
     """
     Clusters tokenized documents by semantic similarity.
 
     A "term" is a keyword or a keyphrase.
     """
+    input = Pipe.type.tokens
+    output = Pipe.type.dist_mat
 
     def __init__(self, debug=False, min_salience=0.2, idf_as_salience=False):
         self.debug = debug
@@ -95,15 +91,27 @@ class SemSim():
         self.idf_as_salience = idf_as_salience
 
 
-    def _tokenize(self, raw_docs):
-        """
-        Return raw documents as lists of tokens.
-        """
-        # Remove keyphrases with more than 3 words to reduce runtime
-        docs = [[t for t in keyword_tokenize(d) if gram_size(t) <= 3] for d in raw_docs]
-        docs, keyphrases = extract_phrases(docs, raw_docs)
+    def __call__(self, token_docs):
+        filtered_token_docs = []
+        for doc in token_docs:
+            # Remove keyphrases with more than 3 words to reduce runtime
+            filtered_token_docs.append([t for t in doc if gram_size(t) <= 3])
+        token_docs = self._preprocess(filtered_token_docs)
+        dist_mat = self._distance_matrix(token_docs)
+        return dist_mat
 
-        return docs
+        # Build descriptors for each cluster
+        # TO DO clean this up
+        #descriptors = []
+        #for clus in clusters:
+            #all_term_counts = defaultdict(int)
+            #for doc in clus:
+                #for term in set(doc.terms):
+                    #all_term_counts[term] += 1
+            #ranked_terms = [(term, all_term_counts[term] * term.salience) for term in sorted(all_term_counts.keys(), key=lambda t: all_term_counts[t] * t.salience, reverse=True)]
+            #descriptors.append(ranked_terms)
+
+        #return clusters, descriptors
 
 
     def _sim_weak(self, d1, d2):
@@ -330,64 +338,30 @@ class SemSim():
         Aggressively prune noisy terms:
             - those that appear only in one document (IDF is 1.0)
             - those that are not sufficiently salient
-            - those which are totally subsumed by a phrase
         This improves runtime and should improve output quality
         """
-        redundant = {t for t in self.all_terms if gram_size(t.term) == 1}
-
-        # This could be more efficient
-        for doc in docs:
-            cleared = set()
-            for t in redundant:
-                if t not in doc:
-                    continue
-
-                # If this term occurs outside of a phrase,
-                # it is no longer a candidate
-                n = doc.count(t)
-                d = sum(1 for t_ in doc if t != t_ and t in t_)
-                if n > d:
-                    cleared.add(t)
-
-            redundant = redundant.difference(cleared)
-
-        if self.debug:
-            print('Removed {0} redundant terms'.format(len(redundant)))
-            print(redundant)
-
-        # For debugging purposes, keep track of of which terms were removed
-        pruned = redundant
-
         for doc in docs:
             original_terms = set(doc.terms)
-            #doc.terms = [t for t in doc if t.salience >= self.min_salience and t.iidf < 1.0 and t not in redundant]
             if self.idf_as_salience:
-                doc.terms = [t for t in doc if t.salience >= self.min_salience and t.salience <= 0.9 and t not in redundant]
+                doc.terms = [t for t in doc if t.salience >= self.min_salience and t.salience <= 0.9]
             else:
-                #doc.terms = [t for t in doc if t.salience >= self.min_salience and t not in redundant]
                 doc.terms = [t for t in doc if t.salience >= self.min_salience]
 
             # See what terms were removed
-            removed = original_terms.difference(set(doc.terms))
-            pruned = pruned.union(removed)
+            pruned = original_terms.difference(set(doc.terms))
 
         print('Pruned:')
         print(pruned)
         return docs, pruned
 
 
-    def _preprocess(self, docs):
-        raw_docs = docs
-
+    def _preprocess(self, token_docs):
         if self.debug:
-            print('clustering {0} docs'.format(len(raw_docs)))
-
-        # Represent docs as list of terms
-        self.docs = self._tokenize(raw_docs)
+            print('clustering {0} docs'.format(len(token_docs)))
 
         # Compute intra-comment IDF and salience for all terms
-        self.iidf = self._internal_idf(self.docs)
-        self.all_terms = {t for terms in self.docs for t in terms}
+        self.iidf = self._internal_idf(token_docs)
+        self.all_terms = {t for terms in token_docs for t in terms}
         self.saliences = {t: self._salience(t) for t in self.all_terms}
 
         # Proper representations
@@ -395,13 +369,13 @@ class SemSim():
         # TO DO clean this up
         self.all_terms = {Term(t, self.saliences[t], self.iidf[t], idf[t]) for t in self.all_terms}
         term_map = {t.term: t for t in self.all_terms}
-        self.docs = [Doc(i, raw_docs[i], [term_map[t] for t in doc]) for i, doc in enumerate(self.docs)]
+        docs = [Doc(i, [term_map[t] for t in doc]) for i, doc in enumerate(token_docs)]
 
         # testing
         self.all_terms_unfiltered = self.all_terms
 
-        self.docs, self.pruned = self._prune(self.docs)
-        self.all_terms = {t for terms in self.docs for t in terms}
+        docs, self.pruned = self._prune(docs)
+        self.all_terms = {t for terms in docs for t in terms}
 
         # Compute normalized saliences
         self.normalized_saliences = {}
@@ -414,10 +388,10 @@ class SemSim():
         if self.debug:
             print('vocabulary has {0} terms'.format(len(self.all_terms)))
 
-        return self.docs
+        return docs
 
 
-    def _distance_matrix(self):
+    def _distance_matrix(self, tokens):
         # Cache a w2v sim mat for faster lookup
         n = len(self.all_terms)
         self.w2v_sim_mat = np.full((n, n), -1)
@@ -426,52 +400,12 @@ class SemSim():
         self.w2v_term_map = {t: i for i, t in enumerate(self.all_terms)}
 
         # Compute similarity matrix and convert to a distance matrix
-        sim_mat = self._similarity_matrix(self.docs)
+        sim_mat = self._similarity_matrix(tokens)
         sim_mat[np.where(sim_mat == 0)] = 0.000001
         dist_mat = 1/sim_mat - 1
         self.sim_mat = sim_mat
         self.dist_mat = dist_mat
         return dist_mat
-
-
-    # TO DO clean this up
-    def cluster(self, raw_docs, eps=None):
-        self._preprocess(raw_docs)
-        dist_mat = self._distance_matrix()
-
-        if self.debug:
-            try:
-                # Mean nearest distances
-                mean_nd = np.mean(np.apply_along_axis(lambda a: np.min(a[np.nonzero(a)]), 1, dist_mat))
-                print('mean nearest distance: {0}'.format(mean_nd))
-            # If it so happens that all the distances are 1,
-            # this will throw a ValueError
-            except ValueError:
-                pass
-
-        if self.debug:
-            print('highlighting docs....')
-        for doc in self.docs:
-            doc.highlighted = markup_highlights(doc.raw, doc.terms)
-
-        if eps is None:
-            eps = estimate_eps(dist_mat)
-        clusters = cluster(dist_mat, eps, min_samples=2)
-        clusters = [[self.docs[i] for i in clus] for clus in clusters]
-
-        # Build descriptors for each cluster
-        # TO DO clean this up
-        descriptors = []
-        for clus in clusters:
-            all_term_counts = defaultdict(int)
-            for doc in clus:
-                for term in set(doc.terms):
-                    all_term_counts[term] += 1
-            ranked_terms = [(term, all_term_counts[term] * term.salience) for term in sorted(all_term_counts.keys(), key=lambda t: all_term_counts[t] * t.salience, reverse=True)]
-            descriptors.append(ranked_terms)
-
-        return clusters, descriptors
-
 
     def _all_max_sim_pairs(self):
         """
@@ -558,49 +492,3 @@ class SemSim():
         print(vecs.shape)
         print(vecs)
         return vecs
-
-
-def markup_highlights(raw_doc, term_doc):
-    """
-    Highlights each instance of the given term
-    in the document. All forms of the term will be highlighted.
-    """
-    doc = raw_doc
-    term_doc = set([t.term for t in term_doc])
-    term_doc = sorted(list(term_doc), key=lambda t: len(t), reverse=True) # Longest first
-    for t in term_doc:
-        for term in t.split(','):
-            term = term.strip()
-
-            # Determine which forms are present for the term in the document
-            if gram_size(term) == 1:
-                # Replace longer forms first so we don't replace their substrings.
-                forms = sorted(lemma_forms(term, doc), key=lambda f: len(f), reverse=True)
-            else:
-                forms = [term]
-
-            for t in forms:
-                # This captures 'F.D.A' if given 'FDA'
-                # yeah, it's kind of overkill
-                reg_ = '[.]?'.join(list(t))
-
-                # Spaces might be spaces, or they might be hyphens
-                reg_ = reg_.replace(' ', '[\s-]')
-
-                # Only match the term if it is not continguous with other characters.
-                # Otherwise it might be a substring of another word, which we want to
-                # ignore
-                # The last matching group is to try and ignore things which are
-                # in html tags.
-                reg = '(^|{0})({1})($|{0})(?=[^>]*(<|$))'.format('[^A-Za-z]', reg_)
-
-                if re.findall(reg, doc):
-                    doc = re.sub(reg, '\g<1><span class="highlight" data-term="{0}">\g<2></span>\g<3>'.format(term), doc, flags=re.IGNORECASE)
-                else:
-                    # If none of the term was found, try with extra alpha characters
-                    # This helps if a phrase was newly learned and only assembled in
-                    # its lemma form, so we may be missing the actual form it appears in.
-                    reg = '(^|{0})({1}[A-Za-z]?)()(?=[^>]*(<|$))'.format('[^A-Za-z]', reg_)
-                    doc = re.sub(reg, '\g<1><span class="highlight" data-term="{0}">\g<2></span>\g<3>'.format(term), doc, flags=re.IGNORECASE)
-
-    return doc

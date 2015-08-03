@@ -176,6 +176,7 @@ button {
 .tabs > li.active.loading {
     border-bottom: 4px solid #aaa;
 }
+h1.loading,
 .tabs > li.loading {
   -webkit-animation: sk-pulseColor 1s infinite ease-in-out;
           animation: sk-pulseColor 1s infinite ease-in-out;

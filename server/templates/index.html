@@ -9,9 +9,6 @@
 <div class="tabbed">
     <ul class="tabs">
         <li class="active" data-tab="subject"><h1>Subject</h1></li>
-        <li data-tab="talked-about"><h1>Talked About</h1></li>
-        <li data-tab="geiger"><h1>Geiger</h1></li>
-        <li data-tab="baseline"><h1>Baseline</h1></li>
     </ul>
     <div class="subject active">
         <div class="loading hide">
@@ -22,63 +19,23 @@
         <h1 class="subject--title"></h1>
         <div class="subject--body"></div>
     </div>
-    <div class="talked-about hide">
-        <div class="loading hide">
-            <div class="loader"></div>
-            <h4>Loading "talked about"...</h4>
-        </div>
-        <div class="error hide"></div>
-        <ul class="thread"></ul>
-    </div>
-    <div class="geiger hide">
-        <div class="loading hide">
-            <div class="loader"></div>
-            <h4>Loading Geiger results...</h4>
-        </div>
-        <div class="error hide"></div>
-        <div class="top-terms hide">
-            <h5>Most salient terms</h5>
-            <ul class="terms"></ul>
-        </div>
-        <ul class="thread"></ul>
-    </div>
-    <div class="baseline hide">
-        <div class="loading hide">
-            <div class="loader"></div>
-            <h4>Loading baseline results...</h4>
-        </div>
-        <div class="error hide"></div>
-        <ul class="thread"></ul>
-    </div>
 </div>
 
 
-<script type="text/html" id="highlight_tmpl">
-    <li class="comment">
-        <span class="quote">“</span><span class="ellipsis">... </span>{0}<span class="ellipsis"> ...</span><span class="quote">”</span>
-        <h6 class="support"><a href="#" class="author"><span>{1}</span></a> and <a href="#" class="commenters"><span>{2}</span> other commenters</a></h6>
-        <div class="full-comment hide">{3}</div>
-        <ul class="cohort hide">{4}</ul>
-    </li>
-</script>
-
 <script type="text/html" id="cluster_tmpl">
     <li class="comment">
-        <ul class="cluster-terms terms">{0}</ul>
-        <h6 class="support"><a href="#" class="commenters"><span>{2}</span> comments</a></h6>
-        <ul class="cohort hide">{1}</ul>
+        <h6 class="support"><a href="#" class="commenters"><span>{1}</span> comments</a></h6>
+        <ul class="cohort">{0}</ul>
     </li>
 </script>
-
-<script type="text/html" id="baseline_tmpl">
-    <li class="comment">
-        <p>{0}</p>
-        <ul class="terms">{1}</ul>
-        <h6 class="support"><a href="#" class="commenters"><span>{3}</span> comments</a></h6>
-        <ul class="cohort hide">{2}</ul>
-    </li>
+<script type="text/html" id="tab_tmpl">
+    <li class="methods-tab" data-tab="{0}"><h1>{0}</h1></li>
 </script>
-
+<script type="text/html" id="method_tmpl">
+    <div class="{0} clusters hide">
+        <ul class="thread"></ul>
+    </div>
+</script>
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
 <script src="/js/main.js"></script>
@@ -104,48 +61,7 @@
             }
         });
 
-        // Show full comments on mouseenter of author name.
-        $('body').on('mouseenter', '.author', function() {
-            var parent = $(this).closest('.comment');
-            parent.find('.cohort').hide();
-            parent.find('.full-comment').show();
-        });
-
-        // Show cohort on mouseenter of support.
-        $('body').on('mouseenter', '.commenters', function() {
-            var parent = $(this).closest('.comment');
-            parent.find('.full-comment').hide();
-            parent.find('.cohort').show();
-        });
-
-        $('body').on('mouseleave', '.comment', function() {
-            $(this).find('.full-comment, .cohort').hide();
-        });
-
-        // oof
-        $('body').on('mouseenter', '.geiger .comment .cohort .terms li', function() {
-            var term = $(this).data('term');
-            $(this).closest('.cohort').addClass('subdued');
-            $(this).closest('.cohort').find('.highlight[data-term="'+term+'"]').addClass('highlight-active');
-        });
-        $('body').on('mouseleave', '.geiger .comment .cohort .terms li', function() {
-            $('.highlight-active').removeClass('highlight-active');
-            $('.subdued').removeClass('subdued');
-        });
-
-        // IDF tooltips
-        $('body').on('mouseenter', '.term', function() {
-            var gidf = $(this).data('gidf'),
-                lidf = $(this).data('lidf'),
-                salience = $(this).data('salience');
-
-            $(this).append('<div class="idf-tooltip">Global idf: '+gidf.toFixed(3)+'<br />Local idf: '+lidf.toFixed(3)+'<br />Salience: '+salience.toFixed(3)+'</div>');
-        });
-        $('body').on('mouseleave', '.term', function() {
-            $(this).find('.idf-tooltip').remove();
-        });
-
-        $('.tabs li').on('click', function() {
+        $('html').on('click', '.tabs li', function() {
             var tab = $(this).data('tab');
             $('.tabs .active').removeClass('active');
             $('.active').addClass('hide').removeClass('active');
@@ -172,10 +88,7 @@
                     $('.subject--title').text(data.title);
                     $('.subject--body').html(data.body);
 
-                    // Load "talked about", "baseline", and "geigerized" right after
-                    get_talked_about();
-                    get_baseline();
-                    get_geigerized();
+                    get_clusters();
                 },
                 complete: function() {
                     $('.subject .loading').hide();
@@ -183,197 +96,58 @@
             });
         }
 
-        // Get Geiger results
-        function get_geigerized() {
-            var el = $('.geiger'),
-                thread = el.find('.thread'),
-                terms = el.find('.terms'),
-                top_terms = el.find('.top-terms');
+        function get_clusters() {
+            var logo = $('.primary-header h1');
+            logo.addClass('loading').removeClass('error');
+            $('.clusters, .method-tab').remove();
 
-            el.find('.loading').show();
-            $('.tabs li[data-tab=geiger]')
-                .addClass('loading').removeClass('error');
-            thread.empty();
-            terms.empty();
-            top_terms.hide();
-
-            $.ajax('/api/geiger', {
+            $.ajax('/api/cluster', {
                 method: 'POST',
                 accepts: 'application/json',
                 contentType: 'application/json',
                 dataType: 'json',
                 data: JSON.stringify({
-                    comments: comments,
+                    comments: comments
                 }),
                 error: function(xhr, status, err) {
-                    el.find('.error').text(err).show();
-                    $('.tabs li[data-tab=geiger]').addClass('error');
+                    logo.addClass('error');
                 },
                 success: function(data, status, xhr) {
-                    var data = data.results;
+                    // Iterate over each clustering method's resulting clusters
+                    for (var key in data.results) {
+                        if (data.results.hasOwnProperty(key)) {
+                            var clusters = data.results[key],
+                                tmpl, tab;
 
-                    for (var i=0; i < data.clusters.length; i++) {
-                        var clus = data.clusters[i][0],
-                            desc = data.clusters[i][1],
-                            clus_html = '',
-                            desc_html = '',
-                            hel;
+                            // Add templates
+                            tmpl = $('#method_tmpl')
+                                    .html()
+                                    .format(key);
+                            tmpl = $(tmpl);
 
-                        // List the top 10 terms describing this cluster
-                        var n_terms = desc.length > 10 ? 10 : desc.length;
-                        for (var j=0; j < n_terms; j++) {
-                            var term = desc[j][0],
-                                freq = desc[j][1];
-                            desc_html += '<li style="background-color:' + color_for_percent(term.normalized_salience) +
-                                         ';" class="term" data-gidf="' + term.gidf + '" data-lidf="' + term.iidf + '" data-salience="' + term.salience + '">' +
-                                         term.term + '</li>';
-                        }
+                            tab = $('#tab_tmpl').html().format(key);
+                            $('.tabs').append(tab);
 
-                        // List out the other comments in this cluster with their terms
-                        for (var j=0; j < clus.length; j++) {
-                            var term_html = '';
-                                doc = clus[j],
-                                freqs = doc.term_freqs;
-                            for (var k=0; k < doc.terms_uniq.length; k++) {
-                                var term = doc.terms_uniq[k];
-                                term_html += '<li data-term="'+ term.term +'" style="background-color:'+ color_for_percent(term.normalized_salience) +
-                                    ';" class="term" data-gidf="' + term.gidf + '" data-lidf="' + term.iidf + '" data-salience="' + term.salience + '">' +
-                                    term.term + ' x' + freqs[term.term].toString() + '</li>';
+                            for (var i=0; i < clusters.length; i++) {
+                                var cluster = clusters[i],
+                                    coh = '', el;
+                                for (var j=0; j < cluster.length; j++) {
+                                    coh += '<li>' + cluster[j] + '</li>';
+                                }
+                                el = $('#cluster_tmpl').html().format(coh, cluster.length);
+                                tmpl.find('.thread').append('<hr/>{0}'.format(el));
                             }
-                            clus_html += '<li>' + doc.highlighted + '<ul class="terms">' + term_html + '</ul></li>';
+                            $('.tabbed').append(tmpl);
                         }
-
-                        // Build the HTML.
-                        hel = $('#cluster_tmpl')
-                                .html()
-                                .format(desc_html, clus_html, clus.length);
-
-                        thread.append(hel);
-                    }
-
-                    // Render top salient terms
-                    for (var i=0; i < 20; i++) {
-                        var term = data.terms[i];
-                        terms.append('<li style="background-color:'+ color_for_percent(term.normalized_salience) +
-                                ';" class="term" data-gidf="' + term.gidf + '" data-lidf="' + term.iidf + '" data-salience="' + term.salience + '">' +
-                                term.term + '</li>');
-                    }
-
-                    top_terms.removeClass('hide').show();
-                },
-                complete: function() {
-                    el.find('.loading').hide();
-                    $('.tabs li[data-tab=geiger]').removeClass('loading');
-                }
-            });
-        }
-
-        function get_talked_about() {
-            var el = $('.talked-about'),
-                thread = el.find('.thread');
-
-            el.find('.loading').show();
-            $('.tabs li[data-tab=talked-about]')
-                .addClass('loading').removeClass('error');
-            thread.empty();
-
-            $.ajax('/api/talked-about', {
-                method: 'POST',
-                accepts: 'application/json',
-                contentType: 'application/json',
-                dataType: 'json',
-                data: JSON.stringify({
-                    comments: comments
-                }),
-                error: function(xhr, status, err) {
-                    el.find('.error').text(err).show();
-                    $('.tabs li[data-tab=talked-about]').addClass('error');
-                },
-                success: function(data, status, xhr) {
-                    var data = data.results;
-                    for (var i=0; i < data.length; i++) {
-                        var res = data[i],
-                            coh = '',
-                            hel;
-
-                        // List out the other sentences in this cohort.
-                        for (var j=0; j < res.cohort.length; j++) {
-                            coh += '<li>' + res.cohort[j] + '</li>';
-                        }
-
-                        // Build the highlight HTML.
-                        hel = $('#highlight_tmpl')
-                                .html()
-                                .format(res.sentence, res.comment.author, res.support, res.comment.body, coh);
-
-                        thread.append('<h5>{0}</h5>{1}'.format(res.aspect, hel));
                     }
                 },
                 complete: function() {
-                    el.find('.loading').hide();
-                    $('.tabs li[data-tab=talked-about]').removeClass('loading');
+                    logo.removeClass('loading');
                 }
             });
 
         }
 
-        function get_baseline() {
-            var el = $('.baseline'),
-                thread = el.find('.thread');
-
-            el.find('.loading').show();
-            $('.tabs li[data-tab=baseline]')
-                .addClass('loading').removeClass('error');
-            thread.empty();
-
-            $.ajax('/api/baseline', {
-                method: 'POST',
-                accepts: 'application/json',
-                contentType: 'application/json',
-                dataType: 'json',
-                data: JSON.stringify({
-                    comments: comments
-                }),
-                error: function(xhr, status, err) {
-                    el.find('.error').text(err).show();
-                    $('.tabs li[data-tab=baseline]').addClass('error');
-                },
-                success: function(data, status, xhr) {
-                    var data = data.results,
-                        clusters = data.clusters,
-                        descs = data.descriptors,
-                        his = data.highlighted_clusters;
-                    for (var i=0; i < clusters.length; i++) {
-                        var clus = clusters[i],
-                            coh = '',
-                            term_html = '',
-                            hel;
-
-                        // List out the other sentences in this cohort.
-                        for (var j=1; j < clus.length; j++) {
-                            coh += '<li>' + his[i][j] + '</li>';
-                        }
-
-                        // Show top 10 descriptors for the cluster
-                        for (var j=0; j < 10; j++) {
-                            term_html += '<li>' + descs[i][j] + '</li>';
-                        }
-
-                        // Build the HTML.
-                        hel = $('#baseline_tmpl')
-                                .html()
-                                .format(his[i][0], term_html, coh, clus.length);
-
-                        thread.append('{0}'.format(hel));
-                    }
-                },
-                complete: function() {
-                    el.find('.loading').hide();
-                    $('.tabs li[data-tab=baseline]').removeClass('loading');
-                }
-            });
-
-        }
     });
 </script>
 
