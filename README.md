@@ -37,11 +37,6 @@ Then try out the demo:
 
     localhost:5001/
 
-To see the results of the aspects ("talked about") algorithm:
-
-    localhost:5001/talked-about
-    localhost:5001/talked-about/<NYT article url>
-
 
 ## Development
 
