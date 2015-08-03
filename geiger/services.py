@@ -2,7 +2,7 @@ import requests
 from requests.auth import HTTPDigestAuth
 
 import config
-from geiger.comment import Comment
+from geiger.models import Comment
 
 
 def get_asset(asset_url):

@@ -11,6 +11,9 @@
     <button class="go-evaluate" type="submit">Evaluate</button>
 </header>
 
+<div class="ref">
+</div>
+
 <div class="tabbed">
     <div class="geiger">
         <div class="loading hide">
@@ -87,13 +90,15 @@
             evaluate(dataset);
         });
 
-        // Show cohort on click of deatils.
+        // Show cohort on click of details.
         $('body').on('click', '.commenters', function(e) {
             e.preventDefault();
             var parent = $(this).closest('.comment');
             if (parent.find('.cohort').css('display') == 'none') {
+                $('.ref').empty().html(parent.html()).show();
                 parent.find('.cohort').show();
             } else {
+                $('.ref').hide();
                 parent.find('.cohort').hide();
             }
             return false;
@@ -254,7 +259,7 @@
                             // See if these two are at all assigned to the same cluster,
                             // according to the predicted labels
                             var label_intersect = data.pred_labels[i].filter(function(n) {
-                                                    return data.pred_labels[id].indexOf(n) != -1;
+                                                    return data.pred_labels[id].indexOf(n) != -1 && n != -1;
                                                   });
 
                             compare_html += $('#compare_tmpl')
@@ -272,9 +277,9 @@
                                 .html()
                                 .format(doc.highlighted,
                                         term_html,
-                                        data.keywords[doc.id].true,
-                                        data.keywords[doc.id].missing,
-                                        data.keywords[doc.id].extra,
+                                        data.keywords[doc.id].true.join(', '),
+                                        data.keywords[doc.id].missing.join(', '),
+                                        data.keywords[doc.id].extra.join(', '),
                                         data.summary.clf_results[doc.id].tp,
                                         (data.summary.clf_results[doc.id].tpr * 100).toFixed(2),
                                         data.summary.clf_results[doc.id].tn,

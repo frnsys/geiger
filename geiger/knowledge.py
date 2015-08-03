@@ -34,7 +34,7 @@ class Bigram():
             print('Loading phrases model...')
 
             # Trained on 100-200k NYT articles
-            _phrases = Phrases.load('data/bigram_model.phrases')
+            _phrases = Phrases.load('data/nyt/bigram_model.phrases')
             print('Done loading phrases')
         elif _phrases_conn is None:
             print('Connecting to phrases process...')
@@ -59,7 +59,7 @@ class IDF():
         self.remote = remote
         if not remote and _idf is None:
             print('Loading idf...')
-            _idf = json.load(open('data/idf.json', 'r'))
+            _idf = json.load(open('data/nyt/idf.json', 'r'))
 
             # Normalize
             mxm = max(_idf.values())
